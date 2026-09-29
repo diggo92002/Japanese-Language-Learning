@@ -14,6 +14,10 @@
 
 ## 上傳 GitHub
 
-建立新的儲存庫，將 `index.html`、`icon.png`、`README.md` 和 `.gitignore` 放在儲存庫根目錄。若要公開網頁，可在儲存庫 Settings → Pages 選擇從主分支根目錄部署。
+建立新的儲存庫，將 `index.html`、`manifest.webmanifest`、`icon.png`、`icon-192.png`、`icon-512.png`、`README.md` 和 `.gitignore` 放在儲存庫根目錄。若要公開網頁，可在儲存庫 Settings → Pages 選擇從主分支根目錄部署。
+
+## 加到主畫面
+
+先用 HTTPS 網址（例如 GitHub Pages）開啟網站；直接開啟本機 `index.html` 無法提供完整的安裝體驗。Android 可用瀏覽器選單的「安裝應用程式」或「加到主畫面」，iPhone 可用瀏覽器分享選單的「加入主畫面」。安裝後仍需網路載入 CDN 樣式與線上例句。
 
 頁面使用 Tailwind 與 Font Awesome 的 CDN，相關外觀需要網路連線。階段 4 的線上例句無法取得時會使用內建內容。
