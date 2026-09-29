@@ -9,9 +9,6 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- FontAwesome 圖示 -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-  <!-- JSZip & FileSaver CDN -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap');
     body { 
@@ -45,14 +42,8 @@
       
       <div class="flex items-center gap-2">
         <!-- 開發者模式按鈕 -->
-        <button onclick="toggleDevModeModal()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs transition">
+        <button id="developerButton" onclick="toggleDevModeModal()" title="開發者模式" aria-label="開啟開發者模式" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs transition">
           <i class="fa-solid fa-code"></i>
-        </button>
-
-        <!-- 打包下載 ZIP 按鈕 -->
-        <button id="downloadZipBtn" onclick="downloadProjectZip()" class="bg-emerald-600 active:bg-emerald-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 shadow-sm">
-          <i class="fa-solid fa-file-zipper"></i>
-          <span>ZIP</span>
         </button>
       </div>
     </div>
@@ -97,6 +88,8 @@
           </button>
         </div>
         <div class="grid grid-cols-1 gap-2 text-xs">
+          <p class="p-3 bg-emerald-50 text-emerald-800 rounded-xl font-bold">開發者模式已開啟：所有階段與測驗均可使用。</p>
+          <button onclick="disableDeveloperMode()" class="p-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-medium text-left">關閉開發者模式</button>
           <button onclick="triggerNetworkUpdate(); toggleDevModeModal();" class="p-3 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-xl font-medium text-left flex items-center justify-between">
             <span>⚡ 強制刷新網路 API 題庫</span>
             <i class="fa-solid fa-bolt text-amber-500"></i>
@@ -152,6 +145,7 @@
     const PHASE_STUDY_HOURS = { 1: 30, 2: 150, 3: 300, 4: 400, 5: 200 };
     const PROGRESS_KEY = 'jp_app_phase_progress_v2';
     let progress = loadProgress();
+    let developerMode = false;
     let activeTestPhase = null;
     let timerInterval = null;
 
@@ -313,7 +307,7 @@
     }
 
     function phaseUnlocked(phase) {
-      return phase === 1 || phase === 99 || (phase >= 2 && phase <= 5 && !!progress.passed[phase - 1]);
+      return developerMode || phase === 1 || phase === 99 || (phase >= 2 && phase <= 5 && !!progress.passed[phase - 1]);
     }
 
     function studySeconds(phase) {
@@ -330,11 +324,11 @@
         const studiedHours = Math.floor(studied / 3600);
         const studiedMinutes = Math.floor((studied % 3600) / 60);
         status.textContent = `已學習 ${studiedHours} 小時 ${studiedMinutes} 分鐘／目標 ${PHASE_STUDY_HOURS[currentPhase]} 小時 · ` +
-          (progress.passed[currentPhase] ? '已通過測驗' : remaining ? `還需 ${Math.floor(remainingMinutes / 60)} 小時 ${remainingMinutes % 60} 分鐘才能考試` : '可參加測驗 · 通過分數 85 分');
+          (developerMode ? '開發者模式：可立即考試' : progress.passed[currentPhase] ? '已通過測驗' : remaining ? `還需 ${Math.floor(remainingMinutes / 60)} 小時 ${remainingMinutes % 60} 分鐘才能考試` : '可參加測驗 · 通過分數 85 分');
       }
       const button = document.getElementById('phaseTestButton');
       if (button) {
-        button.disabled = studySeconds(currentPhase) < PHASE_STUDY_HOURS[currentPhase] * 3600;
+        button.disabled = !developerMode && studySeconds(currentPhase) < PHASE_STUDY_HOURS[currentPhase] * 3600;
         button.classList.toggle('opacity-50', button.disabled);
       }
     }
@@ -354,7 +348,21 @@
 
     function toggleDevModeModal() {
       const modal = document.getElementById('devModal');
+      if (modal.classList.contains('hidden')) {
+        developerMode = true;
+        document.getElementById('developerButton').classList.add('bg-emerald-100', 'text-emerald-700');
+        renderTabs();
+        renderStudyStatus();
+      }
       modal.classList.toggle('hidden');
+    }
+
+    function disableDeveloperMode() {
+      developerMode = false;
+      document.getElementById('developerButton').classList.remove('bg-emerald-100', 'text-emerald-700');
+      document.getElementById('devModal').classList.add('hidden');
+      if (!phaseUnlocked(currentPhase)) switchPhase(1);
+      else { renderTabs(); renderStudyStatus(); }
     }
 
     function renderTabs() {
@@ -565,7 +573,7 @@
     }
 
     function openTestModal(phase) {
-      if (!phaseUnlocked(phase) || studySeconds(phase) < PHASE_STUDY_HOURS[phase] * 3600) return;
+      if (!phaseUnlocked(phase) || (!developerMode && studySeconds(phase) < PHASE_STUDY_HOURS[phase] * 3600)) return;
       activeTestPhase = phase;
       const modal = document.getElementById('testModal');
       const title = document.getElementById('modalTitle');
@@ -741,19 +749,6 @@
       renderStudyStatus();
     }
 
-    function downloadProjectZip() {
-      const zip = new JSZip();
-      const htmlContent = document.documentElement.outerHTML;
-      zip.file("index.html", htmlContent);
-
-      zip.generateAsync({ type: "blob" })
-        .then(function(content) {
-          saveAs(content, "japanese_learning_app.zip");
-        })
-        .catch(function(err) {
-          alert("ZIP 打包失敗：" + err);
-        });
-    }
   </script>
 </body>
 </html>
