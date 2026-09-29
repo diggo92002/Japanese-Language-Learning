@@ -66,7 +66,7 @@
           階段 1
         </span>
         <div id="networkControl" class="hidden flex items-center gap-2 text-xs">
-          <span class="text-indigo-200 text-[10px]">提示更新:</span>
+          <span class="text-indigo-200 text-[10px]">內容更新:</span>
           <span id="countdownTimer" class="font-mono font-bold text-amber-300">30:00</span>
           <button onclick="triggerNetworkUpdate()" class="ml-1 w-6 h-6 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition">
             <i class="fa-solid fa-arrows-rotate text-[10px]" id="refreshSpinner"></i>
@@ -287,22 +287,52 @@
     ];
 
     const backupPhase4 = [
-      { jp: 'すみません、これいくらですか。', tw: '不好意思，請問這個多少錢？', scenario: '購物結帳' },
-      { jp: 'お会計をお願いします。', tw: '麻煩請結帳。', scenario: '餐廳點餐' },
-      { jp: '駅はどこにありますか。', tw: '請問車站落在哪裡？', scenario: '交通問路' },
-      { jp: 'お元氣ですか。お陰様で元氣です。', tw: '您好嗎？托您的福我很健康。', scenario: '日常問候' },
-      { jp: '写真を撮ってもいいですか。', tw: '請問可以拍照嗎？', scenario: '景點觀光' }
+      { jp: 'おはようございます。', tw: '早安。', scenario: '日常問候' },
+      { jp: 'ありがとうございます。', tw: '謝謝。', scenario: '道謝' },
+      { jp: 'すみません、もう一度お願いします。', tw: '不好意思，請再說一次。', scenario: '日常會話' },
+      { jp: 'これはいくらですか。', tw: '這個多少錢？', scenario: '購物' },
+      { jp: 'お会計をお願いします。', tw: '麻煩結帳。', scenario: '用餐' },
+      { jp: '駅はどこですか。', tw: '車站在哪裡？', scenario: '問路' },
+      { jp: 'これをください。', tw: '請給我這個。', scenario: '購物' },
+      { jp: 'おすすめは何ですか。', tw: '有什麼推薦的嗎？', scenario: '用餐' },
+      { jp: 'トイレはどこですか。', tw: '洗手間在哪裡？', scenario: '問路' },
+      { jp: 'ちょっと待ってください。', tw: '請稍等一下。', scenario: '日常會話' },
+      { jp: '大丈夫です。', tw: '沒關係／我沒事。', scenario: '日常會話' },
+      { jp: 'また明日。', tw: '明天見。', scenario: '日常問候' },
+      { jp: '写真を撮ってもいいですか。', tw: '可以拍照嗎？', scenario: '外出' },
+      { jp: 'カードで払えますか。', tw: '可以刷卡嗎？', scenario: '付款' },
+      { jp: '日本語は少ししか話せません。', tw: '我只會說一點日文。', scenario: '日常會話' }
     ];
 
     const backupPhase5 = [
-      { title: '動詞 Te 形 (て形) - 連接與請求', formula: '動詞 1/2/3 類 て形變化', example: 'ちょっと待ってください。(請稍等一下。)' },
-      { title: '動詞 Masu 形 (ます形) - 禮貌體', formula: '動詞 + ます / ません / ました', example: '毎日日本語を勉強します。(每天學習日文。)' },
-      { title: '過去式 (た形) - 經驗與完成', formula: '動詞 た形 + ことがあります', example: '日本へ行ったことがあります。(去過日本。)' },
-      { title: '形容詞否定形 - 表達否定', formula: 'い形容詞去掉い + くないです', example: '今日は寒くないです。(今天不冷。)' }
+      { title: '請求幫忙', formula: '動詞て形 + ください', example: 'ちょっと待ってください。(請稍等一下。)' },
+      { title: '禮貌詢問', formula: '疑問詞 + ですか', example: 'トイレはどこですか。(洗手間在哪裡？)' },
+      { title: '表達想要', formula: '名詞 + が欲しいです', example: '水が欲しいです。(我想要水。)' },
+      { title: '表達想做', formula: '動詞ます形去掉ます + たいです', example: '日本に行きたいです。(我想去日本。)' },
+      { title: '詢問許可', formula: '動詞て形 + もいいですか', example: 'ここに座ってもいいですか。(可以坐這裡嗎？)' },
+      { title: '表達正在做', formula: '動詞て形 + います', example: '今、昼ご飯を食べています。(我現在正在吃午餐。)' },
+      { title: '描述習慣', formula: '時間 + 動詞ます形', example: '毎朝コーヒーを飲みます。(我每天早上喝咖啡。)' },
+      { title: '表達原因', formula: '原因 + から、結果', example: '雨が降っているから、家にいます。(因為在下雨，所以待在家。)' },
+      { title: '表達經驗', formula: '動詞た形 + ことがあります', example: '日本へ行ったことがあります。(我去過日本。)' },
+      { title: '表達否定', formula: 'い形容詞去掉い + くないです', example: '今日は寒くないです。(今天不冷。)' },
+      { title: '表達比較', formula: 'A より B のほうが + 形容詞', example: '電車よりバスのほうが安いです。(公車比電車便宜。)' },
+      { title: '邀請對方', formula: '動詞ます形去掉ます + ませんか', example: '一緒に昼ご飯を食べませんか。(要不要一起吃午餐？)' }
     ];
 
-    let dynamicPhase4Data = [...backupPhase4];
-    let dynamicPhase5Data = [...backupPhase5];
+    let dynamicPhase4Data = backupPhase4.slice(0, 5);
+    let dynamicPhase5Data = backupPhase5.slice(0, 4);
+    const hasLoadedOnlineContent = { 4: false, 5: false };
+    const contentUpdateStatus = { 4: '目前顯示內建例句，按更新取得網路句子。', 5: '目前顯示內建例句，按更新取得網路句子。' };
+    let contentRequestId = 0;
+    const dailyQueries = ['ありがとう', 'お願い', '駅', '電車', 'バス', '食べ', '飲み', '買い', '時間', '仕事', '学校', '友達', '天気', '今日', '明日'];
+    const grammarQueries = [
+      { title: '請求與拜託', formula: '動詞て形 + ください', query: 'ください' },
+      { title: '詢問許可', formula: '動詞て形 + もいいですか', query: 'てもいいですか' },
+      { title: '表達想做', formula: '動詞ます形去掉ます + たいです', query: 'たいです' },
+      { title: '表達正在做', formula: '動詞て形 + います', query: 'ています' },
+      { title: '禮貌詢問', formula: '疑問詞 + ですか', query: 'どこですか' },
+      { title: '表達經驗', formula: '動詞た形 + ことがあります', query: 'ことがあります' }
+    ];
 
     window.addEventListener('DOMContentLoaded', () => {
       renderTabs();
@@ -413,6 +443,7 @@
     function switchPhase(phaseId) {
       if (!phaseUnlocked(phaseId)) return;
       currentPhase = phaseId;
+      document.getElementById('refreshSpinner').classList.remove('fa-spin');
       renderTabs();
 
       const phaseTitles = {
@@ -428,7 +459,7 @@
       document.getElementById('phaseTitle').innerText = phaseTitles[phaseId];
 
       const netControl = document.getElementById('networkControl');
-      if (phaseId <= 4) {
+      if (phaseId <= 5) {
         netControl.classList.remove('hidden');
       } else {
         netControl.classList.add('hidden');
@@ -437,6 +468,7 @@
       renderContent();
       renderStudyStatus();
       if (phaseId <= 3 && !onlineHints[phaseId]) updateLearningHint(phaseId);
+      if ((phaseId === 4 || phaseId === 5) && !hasLoadedOnlineContent[phaseId]) triggerNetworkUpdate();
     }
 
     function startCountdownTimer() {
@@ -445,7 +477,7 @@
         timerSeconds--;
         if (timerSeconds <= 0) {
           timerSeconds = 1800;
-          if (!document.hidden && currentPhase <= 4) triggerNetworkUpdate();
+          if (!document.hidden && currentPhase <= 5) triggerNetworkUpdate();
         }
         updateTimerDisplay();
       }, 1000);
@@ -458,33 +490,68 @@
       if (timerEl) timerEl.innerText = `${m}:${s}`;
     }
 
+    async function searchDailySentences(query, page = Math.floor(Math.random() * 3) + 1) {
+      const url = `https://tatoeba.org/en/api_v0/search?from=jpn&to=cmn&query=${encodeURIComponent(query)}&page=${page}`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('network');
+      const payload = await response.json();
+      return (payload.results || []).flatMap(item => {
+        const translations = (item.translations || []).flat();
+        const translation = translations.find(entry => entry?.lang === 'cmn' && entry.text);
+        const jp = item.text?.trim();
+        const tw = translation?.text?.trim();
+        return jp && tw && jp.length <= 70 && tw.length <= 100 ? [{ jp, tw }] : [];
+      });
+    }
+
     async function triggerNetworkUpdate() {
       timerSeconds = 1800;
       updateTimerDisplay();
       if (currentPhase <= 3) return updateLearningHint(currentPhase);
-      if (currentPhase !== 4) return;
+      if (currentPhase !== 4 && currentPhase !== 5) return;
+      const phase = currentPhase;
+      const requestId = ++contentRequestId;
       const spinner = document.getElementById('refreshSpinner');
       if (spinner) spinner.classList.add('fa-spin');
-
+      contentUpdateStatus[phase] = '正在取得網路例句…';
+      renderContent();
+      renderStudyStatus();
       try {
-        const res = await fetch('https://tatoeba.org/en/api_v0/search?from=jpn&to=cmn&query=日語&page=1');
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.results && data.results.length > 0) {
-            dynamicPhase4Data = data.results.slice(0, 10).map((item, idx) => ({
-              jp: item.text,
-              tw: item.translations?.[0]?.[0]?.text || '常見日語表達',
-              scenario: ['日常會話', '旅行溝通', '職場表達'][idx % 3]
-            }));
-          }
+        if (phase === 4) {
+          const queries = shuffle(dailyQueries).slice(0, 3);
+          const results = await Promise.allSettled(queries.map(searchDailySentences));
+          const current = new Set(dynamicPhase4Data.map(item => item.jp));
+          const unique = new Set();
+          const sentences = results.flatMap(result => result.status === 'fulfilled' ? result.value : [])
+            .filter(item => !current.has(item.jp) && !unique.has(item.jp) && unique.add(item.jp));
+          if (sentences.length < 3) throw new Error('not enough sentences');
+          if (requestId !== contentRequestId) return;
+          dynamicPhase4Data = shuffle(sentences).slice(0, 5).map(item => ({ ...item, scenario: '網路日常例句' }));
+        } else {
+          const queries = shuffle(grammarQueries).slice(0, 4);
+          const results = await Promise.allSettled(queries.map(item => searchDailySentences(item.query, 1)));
+          const current = new Set(dynamicPhase5Data.map(item => item.example));
+          const online = queries.flatMap((item, index) => {
+            const result = results[index];
+            if (result.status !== 'fulfilled') return [];
+            const sentence = shuffle(result.value).find(entry => entry.jp.includes(item.query) && !current.has(`${entry.jp}（${entry.tw}）`));
+            return sentence ? [{ title: item.title, formula: item.formula, example: `${sentence.jp}（${sentence.tw}）` }] : [];
+          });
+          if (online.length < 2) throw new Error('not enough sentences');
+          if (requestId !== contentRequestId) return;
+          dynamicPhase5Data = online;
         }
-      } catch (err) {
-        dynamicPhase4Data = [...backupPhase4].sort(() => Math.random() - 0.5);
+        if (requestId !== contentRequestId) return;
+        hasLoadedOnlineContent[phase] = true;
+        contentUpdateStatus[phase] = '網路例句來源：Tatoeba';
+      } catch (_) {
+        if (requestId === contentRequestId) contentUpdateStatus[phase] = '目前無法取得新例句，保留原有內容。';
       } finally {
-        setTimeout(() => {
+        if (requestId === contentRequestId && currentPhase === phase) {
           if (spinner) spinner.classList.remove('fa-spin');
-          if (currentPhase === 4) { renderContent(); renderStudyStatus(); }
-        }, 400);
+          renderContent();
+          renderStudyStatus();
+        }
       }
     }
 
@@ -571,10 +638,10 @@
               <span>開始階段 ${currentPhase} 模擬測驗 (20 題)</span>
             </button>
             <p class="text-xs text-slate-500 px-1">點選假名可聽發音並查看個別範例</p>
-            <div id="kanaGrid" class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1.5 sm:gap-2">
+            <div id="kanaGrid" class="grid grid-cols-5 sm:grid-cols-7 lg:grid-cols-9 gap-1 sm:gap-1.5">
               ${data.map((item, index) => `
-                <button type="button" data-kana-index="${index}" aria-pressed="false" aria-label="${escapeHtml(item.kana)}，${escapeHtml(item.romaji)}，查看範例" class="p-2 bg-white border border-slate-200 rounded-xl active:scale-95 transition flex flex-col items-center justify-center shadow-xs min-h-16">
-                  <span class="text-xl sm:text-2xl font-bold text-indigo-600">${escapeHtml(item.kana)}</span>
+                <button type="button" data-kana-index="${index}" aria-pressed="false" aria-label="${escapeHtml(item.kana)}，${escapeHtml(item.romaji)}，查看範例" class="px-1 py-1.5 bg-white border border-slate-200 rounded-xl active:scale-95 transition flex flex-col items-center justify-center shadow-xs min-h-12">
+                  <span class="text-lg sm:text-xl font-bold text-indigo-600">${escapeHtml(item.kana)}</span>
                   <span class="text-[10px] font-mono text-slate-400">${escapeHtml(item.romaji)}</span>
                 </button>
               `).join('')}
@@ -612,6 +679,7 @@
               <i class="fa-solid fa-pen-to-square"></i>
               <span>開始階段 4 會話測驗 (20 題)</span>
             </button>
+            <p class="text-[11px] text-slate-500 px-1" aria-live="polite">${escapeHtml(contentUpdateStatus[4])}</p>
             <div class="space-y-2">
               ${dynamicPhase4Data.map((item, index) => `
                 <div class="p-3.5 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-2">
@@ -639,14 +707,15 @@
               <i class="fa-solid fa-pen-to-square"></i>
               <span>開始階段 5 語法測驗 (20 題)</span>
             </button>
+            <p class="text-[11px] text-slate-500 px-1" aria-live="polite">${escapeHtml(contentUpdateStatus[5])}</p>
             <div class="space-y-2">
-              ${dynamicPhase5Data.map(item => `
+              ${dynamicPhase5Data.map((item, index) => `
                 <div class="p-3.5 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-2">
-                  <h3 class="text-xs font-bold text-indigo-600">${item.title}</h3>
-                  <div class="p-2 bg-slate-50 border rounded-xl text-[11px] font-mono text-slate-600">${item.formula}</div>
+                  <h3 class="text-xs font-bold text-indigo-600">${escapeHtml(item.title)}</h3>
+                  <div class="p-2 bg-slate-50 border rounded-xl text-[11px] font-mono text-slate-600">${escapeHtml(item.formula)}</div>
                   <div class="flex items-center justify-between pt-1">
-                    <p class="text-xs text-slate-700 font-medium">${item.example}</p>
-                    <button onclick="speak('${item.example}')" class="text-indigo-600 text-xs ml-2">
+                    <p class="text-xs text-slate-700 font-medium">${escapeHtml(item.example)}</p>
+                    <button data-grammar-speak-index="${index}" aria-label="播放日語例句" class="text-indigo-600 text-xs ml-2">
                       <i class="fa-solid fa-volume-high"></i>
                     </button>
                   </div>
@@ -655,6 +724,9 @@
             </div>
           </div>
         `;
+        area.querySelectorAll('[data-grammar-speak-index]').forEach(button => {
+          button.addEventListener('click', () => speak(dynamicPhase5Data[Number(button.dataset.grammarSpeakIndex)].example.split(/[（(]/)[0]));
+        });
       } else if (currentPhase === 99) {
         const wrongList = getStoredWrongQuestions();
         if (wrongList.length === 0) {
