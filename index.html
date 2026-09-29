@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/png" href="icon.png" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>日文闖關學習系統 - 手機優化版</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome 圖示 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <!-- JSZip & FileSaver CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap');
+    body { 
+      font-family: 'Noto Sans TC', 'Noto Sans JP', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    /* 隱藏橫向滾動條 */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col antialiased">
+
+  <!-- Header 導覽列 (手機優化) -->
+  <header class="bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-40 shadow-xs">
+    <div class="max-w-5xl mx-auto px-4 py-2.5 flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-extrabold text-lg shadow-indigo-200 shadow-md">
+          あ
+        </div>
+        <div>
+          <h1 class="font-bold text-base text-slate-800 leading-none">日文闖關學習</h1>
+          <p class="text-[10px] text-slate-400 mt-0.5">隨機測驗 & 動態錯題本</p>
+        </div>
+      </div>
+      
+      <div class="flex items-center gap-2">
+        <!-- 開發者模式按鈕 -->
+        <button onclick="toggleDevModeModal()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs transition">
+          <i class="fa-solid fa-code"></i>
+        </button>
+
+        <!-- 打包下載 ZIP 按鈕 -->
+        <button id="downloadZipBtn" onclick="downloadProjectZip()" class="bg-emerald-600 active:bg-emerald-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 shadow-sm">
+          <i class="fa-solid fa-file-zipper"></i>
+          <span>ZIP</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主內容區域 -->
+  <main class="max-w-5xl mx-auto px-3 py-3 flex-1 w-full space-y-3 pb-20">
+
+    <!-- 階段選擇 (手機橫向滑動卡片) -->
+    <nav class="overflow-x-auto no-scrollbar py-1">
+      <div class="flex gap-2 min-w-max px-1" id="phaseTabContainer">
+        <!-- JavaScript 動態渲染階段頁籤 -->
+      </div>
+    </nav>
+
+    <!-- 頂部資訊卡片 (狀態、計時與手動更新) -->
+    <div id="statusHeader" class="bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-2xl p-4 text-white shadow-md shadow-indigo-100 space-y-2">
+      <div class="flex items-center justify-between">
+        <span id="phaseBadge" class="px-2.5 py-0.5 bg-white/20 backdrop-blur-md text-white text-[11px] font-bold rounded-lg border border-white/20">
+          階段 1
+        </span>
+        <div id="networkControl" class="hidden flex items-center gap-2 text-xs">
+          <span class="text-indigo-200 text-[10px]">自動更換:</span>
+          <span id="countdownTimer" class="font-mono font-bold text-amber-300">20:00</span>
+          <button onclick="triggerNetworkUpdate()" class="ml-1 w-6 h-6 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition">
+            <i class="fa-solid fa-arrows-rotate text-[10px]" id="refreshSpinner"></i>
+          </button>
+        </div>
+      </div>
+      <h2 id="phaseTitle" class="text-base font-bold leading-tight">清音 50 音基礎練習區</h2>
+    </div>
+
+    <!-- 開發者模式選單 (Modal 形式) -->
+    <div id="devModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 hidden">
+      <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-2xl p-5 space-y-4 shadow-2xl">
+        <div class="flex justify-between items-center border-b pb-2">
+          <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+            <i class="fa-solid fa-sliders text-amber-500"></i> 開發者測試控制台
+          </h3>
+          <button onclick="toggleDevModeModal()" class="text-slate-400 text-sm">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div class="grid grid-cols-1 gap-2 text-xs">
+          <button onclick="triggerNetworkUpdate(); toggleDevModeModal();" class="p-3 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-xl font-medium text-left flex items-center justify-between">
+            <span>⚡ 強制刷新網路 API 題庫</span>
+            <i class="fa-solid fa-bolt text-amber-500"></i>
+          </button>
+          <button onclick="timerSeconds=5; updateTimerDisplay(); toggleDevModeModal();" class="p-3 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-xl font-medium text-left flex items-center justify-between">
+            <span>⏱️ 將倒數計時縮短至 5 秒</span>
+            <i class="fa-solid fa-clock text-amber-500"></i>
+          </button>
+          <button onclick="clearWrongQuestions(); toggleDevModeModal();" class="p-3 bg-red-50 hover:bg-red-100 text-red-800 rounded-xl font-medium text-left flex items-center justify-between">
+            <span>🗑️ 清空所有錯題記錄</span>
+            <i class="fa-solid fa-trash text-red-500"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 主練習內容呈現區 -->
+    <section id="contentArea" class="space-y-3">
+      <!-- 動態載入內容 -->
+    </section>
+
+  </main>
+
+  <!-- 全螢幕測驗 Modal (手機端滿版設計) -->
+  <div id="testModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-md flex items-end sm:items-center justify-center z-50 hidden">
+    <div class="bg-white w-full max-w-md h-[92vh] sm:h-auto sm:max-h-[85vh] rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+      <!-- Modal Header -->
+      <div class="bg-slate-900 text-white px-5 py-3.5 flex justify-between items-center shrink-0">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-graduation-cap text-indigo-400"></i>
+          <h3 class="font-bold text-sm" id="modalTitle">階段測驗</h3>
+        </div>
+        <button onclick="closeModal()" class="text-slate-400 hover:text-white transition">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+      <!-- Modal Body -->
+      <div class="p-5 overflow-y-auto flex-1 space-y-4" id="modalBody">
+        <!-- 測驗內容動態渲染 -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-slate-200 py-3 text-center text-[11px] text-slate-400 fixed bottom-0 left-0 right-0 z-30">
+    <p>日文闖關系統 &copy; 2026 | 手機版優化</p>
+  </footer>
+
+  <!-- JavaScript 邏輯程式碼 -->
+  <script>
+    let currentPhase = 1;
+    let timerSeconds = 1200;
+    const PHASE_STUDY_HOURS = { 1: 30, 2: 150, 3: 300, 4: 400, 5: 200 };
+    const PROGRESS_KEY = 'jp_app_phase_progress_v2';
+    let progress = loadProgress();
+    let activeTestPhase = null;
+    let timerInterval = null;
+
+    let testQuestions = [];
+    let currentQuestionIdx = 0;
+    let userScore = 0;
+
+    // 階段 1：46 清音
+    const phase1Data = [
+      { kana: 'あ', romaji: 'a', word: '朝', reading: 'あさ', meaning: '早晨' },
+      { kana: 'い', romaji: 'i', word: '犬', reading: 'いぬ', meaning: '狗' },
+      { kana: 'う', romaji: 'u', word: '海', reading: 'うみ', meaning: '大海' },
+      { kana: 'え', romaji: 'e', word: '駅', reading: 'えき', meaning: '車站' },
+      { kana: 'お', romaji: 'o', word: '茶', reading: 'おちゃ', meaning: '綠茶' },
+      { kana: 'か', romaji: 'ka', word: '傘', reading: 'かさ', meaning: '雨傘' },
+      { kana: 'き', romaji: 'ki', word: '木', reading: 'き', meaning: '樹木' },
+      { kana: 'く', romaji: 'ku', word: '車', reading: 'くるま', meaning: '車子' },
+      { kana: 'け', romaji: 'ke', word: '朝', reading: 'けさ', meaning: '今晨' },
+      { kana: 'こ', romaji: 'ko', word: '声', reading: 'こえ', meaning: '聲音' },
+      { kana: 'さ', romaji: 'sa', word: '魚', reading: 'さかな', meaning: '魚類' },
+      { kana: 'し', romaji: 'shi', word: '塩', reading: 'しお', meaning: '鹽巴' },
+      { kana: 'す', romaji: 'su', word: '寿司', reading: 'すし', meaning: '壽司' },
+      { kana: 'せ', romaji: 'se', word: '世界', reading: 'せかい', meaning: '世界' },
+      { kana: 'そ', romaji: 'so', word: '空', reading: 'そら', meaning: '天空' },
+      { kana: 'た', romaji: 'ta', word: '卵', reading: 'たまご', meaning: '雞蛋' },
+      { kana: 'ち', romaji: 'chi', word: '父', reading: 'ちち', meaning: '父親' },
+      { kana: 'つ', romaji: 'tsu', word: '月', reading: 'つき', meaning: '月亮' },
+      { kana: 'て', romaji: 'te', word: '手', reading: 'て', meaning: '手部' },
+      { kana: 'と', romaji: 'to', word: '時計', reading: 'とけい', meaning: '時鐘' },
+      { kana: 'な', romaji: 'na', word: '夏', reading: 'なつ', meaning: '夏天' },
+      { kana: 'に', romaji: 'ni', word: '肉', reading: 'にく', meaning: '肉類' },
+      { kana: 'ぬ', romaji: 'nu', word: '犬', reading: 'いぬ', meaning: '狗' },
+      { kana: 'ね', romaji: 'ne', word: '猫', reading: 'ねこ', meaning: '貓咪' },
+      { kana: 'の', romaji: 'no', word: '海苔', reading: 'のり', meaning: '海苔' },
+      { kana: 'は', romaji: 'ha', word: '花', reading: 'はな', meaning: '花朵' },
+      { kana: 'ひ', romaji: 'hi', word: '光', reading: 'ひかり', meaning: '光芒' },
+      { kana: 'ふ', romaji: 'fu', word: '船', reading: 'ふね', meaning: '船隻' },
+      { kana: 'へ', romaji: 'he', word: '部屋', reading: 'へや', meaning: '房間' },
+      { kana: 'ほ', romaji: 'ho', word: '本', reading: 'ほん', meaning: '書籍' },
+      { kana: 'ま', romaji: 'ma', word: '町', reading: 'まち', meaning: '城鎮' },
+      { kana: 'み', romaji: 'mi', word: '水', reading: 'みず', meaning: '水' },
+      { kana: 'む', romaji: 'mu', word: '虫', reading: 'むし', meaning: '昆蟲' },
+      { kana: 'め', romaji: 'me', word: '目', reading: 'め', meaning: '眼睛' },
+      { kana: 'も', romaji: 'mo', word: '森', reading: 'もり', meaning: '森林' },
+      { kana: 'や', romaji: 'ya', word: '山', reading: 'やま', meaning: '高山' },
+      { kana: 'ゆ', romaji: 'yu', word: '雪', reading: 'ゆき', meaning: '白雪' },
+      { kana: 'よ', romaji: 'yo', word: '夜', reading: 'よる', meaning: '夜晚' },
+      { kana: 'ら', romaji: 'ra', word: '桜', reading: 'さくら', meaning: '櫻花' },
+      { kana: 'り', romaji: 'ri', word: '林檎', reading: 'りんご', meaning: '蘋果' },
+      { kana: 'る', romaji: 'ru', word: '部屋', reading: 'へや', meaning: '房間' },
+      { kana: 'れ', romaji: 're', word: '歴史', reading: 'れきし', meaning: '歷史' },
+      { kana: 'ろ', romaji: 'ro', word: '六', reading: 'ろく', meaning: '數字六' },
+      { kana: 'わ', romaji: 'wa', word: '川', reading: 'かわ', meaning: '河川' },
+      { kana: 'を', romaji: 'wo', word: '～を', reading: 'を', meaning: '賓格助詞' },
+      { kana: 'ん', romaji: 'n', word: '本', reading: 'ほん', meaning: '書籍' }
+    ];
+
+    // 階段 2：25 濁音 / 半濁音
+    const phase2Data = [
+      { kana: 'が', romaji: 'ga', word: '外国人', reading: 'がいこくじん', meaning: '外國人' },
+      { kana: 'ぎ', romaji: 'gi', word: '銀行', reading: 'ぎんこう', meaning: '銀行' },
+      { kana: 'ぐ', romaji: 'gu', word: '軍手', reading: 'ぐんて', meaning: '工作手套' },
+      { kana: 'げ', romaji: 'ge', word: '外科', reading: 'げか', meaning: '外科' },
+      { kana: 'ご', romaji: 'go', word: 'ご飯', reading: 'ごはん', meaning: '米飯' },
+      { kana: 'ざ', romaji: 'za', word: '雜誌', reading: 'ざっし', meaning: '雜誌' },
+      { kana: 'じ', romaji: 'ji', word: '時間', reading: 'じかん', meaning: '時間' },
+      { kana: 'ず', romaji: 'zu', word: '図書', reading: 'としょ', meaning: '圖書' },
+      { kana: 'ぜ', romaji: 'ze', word: '全部', reading: 'ぜんぶ', meaning: '全部' },
+      { kana: 'ぞ', romaji: 'zo', word: '象', reading: 'ぞう', meaning: '大象' },
+      { kana: 'だ', romaji: 'da', word: '大學', reading: 'だいがく', meaning: '大學' },
+      { kana: 'ぢ', romaji: 'ji', word: '鼻血', reading: 'はなぢ', meaning: '流鼻血' },
+      { kana: 'づ', romaji: 'zu', word: '三日月', reading: 'みかづき', meaning: '新月' },
+      { kana: 'で', romaji: 'de', word: '電車', reading: 'でんしゃ', meaning: '電車' },
+      { kana: 'ど', romaji: 'do', word: '友達', reading: 'ともだち', meaning: '朋友' },
+      { kana: 'ば', romaji: 'ba', word: '場所', reading: 'ばしょ', meaning: '場所' },
+      { kana: 'び', romaji: 'bi', word: '病院', reading: 'びょういん', meaning: '醫院' },
+      { kana: 'ぶ', romaji: 'bu', word: '豚肉', reading: 'ぶたにく', meaning: '豬肉' },
+      { kana: 'べ', romaji: 'be', word: '勉強', reading: 'べんきょう', meaning: '學習' },
+      { kana: 'ぼ', romaji: 'bo', word: '帽子', reading: 'ぼうし', meaning: '帽子' },
+      { kana: 'ぱ', romaji: 'pa', word: 'パン', reading: 'ぱん', meaning: '麵包' },
+      { kana: 'ぴ', romaji: 'pi', word: 'ピアノ', reading: 'ぴあの', meaning: '鋼琴' },
+      { kana: 'ぷ', romaji: 'pu', word: 'プール', reading: 'ぷーる', meaning: '游泳池' },
+      { kana: 'ぺ', romaji: 'pe', word: 'ペン', reading: 'ぺん', meaning: '原子筆' },
+      { kana: 'ぽ', romaji: 'po', word: 'ポケット', reading: 'ぽけっと', meaning: '口袋' }
+    ];
+
+    // 階段 3：33 拗音
+    const phase3Data = [
+      { kana: 'きゃ', romaji: 'kya', word: '客', reading: 'きゃく', meaning: '顧客' },
+      { kana: 'きゅ', romaji: 'kyu', word: '急行', reading: 'きゅうこう', meaning: '急行列車' },
+      { kana: 'きょ', romaji: 'kyo', word: '今日', reading: 'きょう', meaning: '今天' },
+      { kana: 'しゃ', romaji: 'sha', word: '寫真', reading: 'しゃしん', meaning: '照片' },
+      { kana: 'しゅ', romaji: 'shu', word: '宿題', reading: 'しゅくだい', meaning: '作業' },
+      { kana: 'しょ', romaji: 'sho', word: '食堂', reading: 'しょくどう', meaning: '食堂' },
+      { kana: 'ちゃ', romaji: 'cha', word: '茶碗', reading: 'ちゃわん', meaning: '飯碗' },
+      { kana: 'ちゅ', romaji: 'chu', word: '注意', reading: 'ちゅうい', meaning: '注意' },
+      { kana: 'ちょ', romaji: 'cho', word: '貯金', reading: 'ちょきん', meaning: '存款' },
+      { kana: 'にゃ', romaji: 'nya', word: '蒟蒻', reading: 'こんにゃく', meaning: '魔芋' },
+      { kana: 'にゅ', romaji: 'nyu', word: '乳製品', reading: 'にゅうせいひん', meaning: '乳製品' },
+      { kana: 'にょ', romaji: 'nyo', word: '女房', reading: 'にょうぼう', meaning: '妻子' },
+      { kana: 'ひゃ', romaji: 'hya', word: '百', reading: 'ひゃく', meaning: '數字百' },
+      { kana: 'ひゅ', romaji: 'hyu', word: '日日', reading: 'ひゅうひゅう', meaning: '風吹聲' },
+      { kana: 'ひょ', romaji: 'hyo', word: '評判', reading: 'ひょうばん', meaning: '評價' },
+      { kana: 'みゃ', romaji: 'mya', word: '脈', reading: 'みゃく', meaning: '脈搏' },
+      { kana: 'みゅ', romaji: 'myu', word: 'ミュート', reading: 'みゅーと', meaning: '靜音' },
+      { kana: 'みょ', romaji: 'myo', word: '名字', reading: 'みょうじ', meaning: '姓氏' },
+      { kana: 'りゃ', romaji: 'rya', word: '略語', reading: 'りゃくご', meaning: '縮寫' },
+      { kana: 'りゅ', romaji: 'ryu', word: '留學', reading: 'りゅうがく', meaning: '留學' },
+      { kana: 'りょ', romaji: 'ryo', word: '旅行', reading: 'りょこう', meaning: '旅行' },
+      { kana: 'ぎゃ', romaji: 'gya', word: '逆', reading: 'ぎゃく', meaning: '相反' },
+      { kana: 'ぎゅ', romaji: 'gyu', word: '牛肉', reading: 'ぎゅうにく', meaning: '牛肉' },
+      { kana: 'ぎょ', romaji: 'gyo', word: '漁業', reading: 'ぎょぎょう', meaning: '漁業' },
+      { kana: 'じゃ', romaji: 'ja', word: '邪魔', reading: 'じゃま', meaning: '打擾' },
+      { kana: 'じゅ', romaji: 'ju', word: '授業', reading: 'じゅぎょう', meaning: '上課' },
+      { kana: 'じょ', romaji: 'jo', word: '女性', reading: 'じょせい', meaning: '女性' },
+      { kana: 'びゃ', romaji: 'bya', word: '白夜', reading: 'びゃくや', meaning: '白夜' },
+      { kana: 'びゅ', romaji: 'byu', word: 'ビュー', reading: 'びゅー', meaning: '景觀' },
+      { kana: 'びょ', romaji: 'byo', word: '病院', reading: 'びょういん', meaning: '醫院' },
+      { kana: 'ぴゃ', romaji: 'pya', word: 'ロッぴゃく', reading: 'ろっぴゃく', meaning: '六百' },
+      { kana: 'ぴゅ', romaji: 'pyu', word: 'ピュア', reading: 'ぴゅあ', meaning: '純潔' },
+      { kana: 'ぴょ', romaji: 'pyo', word: '跳躍', reading: 'ぴょんぴょん', meaning: '跳躍' }
+    ];
+
+    const backupPhase4 = [
+      { jp: 'すみません、これいくらですか。', tw: '不好意思，請問這個多少錢？', scenario: '購物結帳' },
+      { jp: 'お会計をお願いします。', tw: '麻煩請結帳。', scenario: '餐廳點餐' },
+      { jp: '駅はどこにありますか。', tw: '請問車站落在哪裡？', scenario: '交通問路' },
+      { jp: 'お元氣ですか。お陰様で元氣です。', tw: '您好嗎？托您的福我很健康。', scenario: '日常問候' },
+      { jp: '写真を撮ってもいいですか。', tw: '請問可以拍照嗎？', scenario: '景點觀光' }
+    ];
+
+    const backupPhase5 = [
+      { title: '動詞 Te 形 (て形) - 連接與請求', formula: '動詞 1/2/3 類 て形變化', example: 'ちょっと待ってください。(請稍等一下。)' },
+      { title: '動詞 Masu 形 (ます形) - 禮貌體', formula: '動詞 + ます / ません / ました', example: '毎日日本語を勉強します。(每天學習日文。)' },
+      { title: '過去式 (た形) - 經驗與完成', formula: '動詞 た形 + ことがあります', example: '日本へ行ったことがあります。(去過日本。)' }
+    ];
+
+    let dynamicPhase4Data = [...backupPhase4];
+    let dynamicPhase5Data = [...backupPhase5];
+
+    window.addEventListener('DOMContentLoaded', () => {
+      renderTabs();
+      switchPhase(1);
+      startCountdownTimer();
+      startStudyTimer();
+    });
+
+    function loadProgress() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}');
+        return { seconds: saved.seconds || {}, passed: saved.passed || {} };
+      } catch (_) {
+        return { seconds: {}, passed: {} };
+      }
+    }
+
+    function saveProgress() {
+      localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
+    }
+
+    function phaseUnlocked(phase) {
+      return phase === 1 || phase === 99 || (phase >= 2 && phase <= 5 && !!progress.passed[phase - 1]);
+    }
+
+    function studySeconds(phase) {
+      return Math.min(PHASE_STUDY_HOURS[phase] * 3600, Number(progress.seconds[phase]) || 0);
+    }
+
+    function renderStudyStatus() {
+      const status = document.getElementById('studyStatus');
+      if (status && currentPhase !== 99) {
+        const required = PHASE_STUDY_HOURS[currentPhase] * 3600;
+        const studied = studySeconds(currentPhase);
+        const remaining = Math.max(0, required - studied);
+        const remainingMinutes = Math.ceil(remaining / 60);
+        const studiedHours = Math.floor(studied / 3600);
+        const studiedMinutes = Math.floor((studied % 3600) / 60);
+        status.textContent = `已學習 ${studiedHours} 小時 ${studiedMinutes} 分鐘／目標 ${PHASE_STUDY_HOURS[currentPhase]} 小時 · ` +
+          (progress.passed[currentPhase] ? '已通過測驗' : remaining ? `還需 ${Math.floor(remainingMinutes / 60)} 小時 ${remainingMinutes % 60} 分鐘才能考試` : '可參加測驗 · 通過分數 85 分');
+      }
+      const button = document.getElementById('phaseTestButton');
+      if (button) {
+        button.disabled = studySeconds(currentPhase) < PHASE_STUDY_HOURS[currentPhase] * 3600;
+        button.classList.toggle('opacity-50', button.disabled);
+      }
+    }
+
+    function startStudyTimer() {
+      let lastTick = Date.now();
+      setInterval(() => {
+        const now = Date.now();
+        const elapsed = Math.min(2, Math.max(0, (now - lastTick) / 1000));
+        lastTick = now;
+        if (document.hidden || currentPhase === 99 || !phaseUnlocked(currentPhase) || studySeconds(currentPhase) >= PHASE_STUDY_HOURS[currentPhase] * 3600 || !document.getElementById('testModal').classList.contains('hidden')) return;
+        progress.seconds[currentPhase] = studySeconds(currentPhase) + elapsed;
+        saveProgress();
+        renderStudyStatus();
+      }, 1000);
+    }
+
+    function toggleDevModeModal() {
+      const modal = document.getElementById('devModal');
+      modal.classList.toggle('hidden');
+    }
+
+    function renderTabs() {
+      const tabs = [
+        { id: 1, name: '階段 1', desc: '五十音 · 30h' },
+        { id: 2, name: '階段 2', desc: '單字句型 · 150h' },
+        { id: 3, name: '階段 3', desc: '中級文法 · 300h' },
+        { id: 4, name: '階段 4', desc: '實戰表達 · 400h' },
+        { id: 5, name: '階段 5', desc: '綜合沉浸 · 200h' },
+        { id: 99, name: '錯題本', desc: '弱點' }
+      ];
+
+      const container = document.getElementById('phaseTabContainer');
+      container.innerHTML = tabs.map(tab => `
+        <button onclick="switchPhase(${tab.id})" ${phaseUnlocked(tab.id) ? '' : 'disabled title="請先通過前一階段測驗"'} class="px-3 py-2 rounded-xl flex flex-col items-center justify-center transition ${!phaseUnlocked(tab.id) ? 'opacity-45 cursor-not-allowed bg-slate-100 text-slate-400 border border-slate-200' : tab.id === currentPhase ? 'bg-indigo-600 text-white shadow-md shadow-indigo-100 font-bold' : 'bg-white text-slate-600 border border-slate-200'}">
+          <span class="text-xs font-bold leading-none">${tab.name}</span>
+          <span class="text-[9px] opacity-75 mt-1">${tab.desc}</span>
+        </button>
+      `).join('');
+    }
+
+    function switchPhase(phaseId) {
+      if (!phaseUnlocked(phaseId)) return;
+      currentPhase = phaseId;
+      renderTabs();
+
+      const phaseTitles = {
+        1: '階段 1：五十音與基礎發音 · 30 小時',
+        2: '階段 2：基礎單字與句型 N5～N4 · 150 小時',
+        3: '階段 3：中級文法與詞彙 N3～N2 · 300 小時',
+        4: '階段 4：實戰應用與表達 · 400 小時',
+        5: '階段 5：綜合測驗與生活沉浸 · 200 小時',
+        99: '錯題本：個人弱點強化複習'
+      };
+
+      document.getElementById('phaseBadge').innerText = phaseId === 99 ? '弱點' : `階段 ${phaseId}`;
+      document.getElementById('phaseTitle').innerText = phaseTitles[phaseId];
+
+      const netControl = document.getElementById('networkControl');
+      if (phaseId >= 4 && phaseId !== 99) {
+        netControl.classList.remove('hidden');
+      } else {
+        netControl.classList.add('hidden');
+      }
+
+      renderContent();
+      renderStudyStatus();
+    }
+
+    function startCountdownTimer() {
+      if (timerInterval) clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        timerSeconds--;
+        if (timerSeconds <= 0) {
+          timerSeconds = 1200;
+          triggerNetworkUpdate();
+        }
+        updateTimerDisplay();
+      }, 1000);
+    }
+
+    function updateTimerDisplay() {
+      const m = Math.floor(timerSeconds / 60).toString().padStart(2, '0');
+      const s = (timerSeconds % 60).toString().padStart(2, '0');
+      const timerEl = document.getElementById('countdownTimer');
+      if (timerEl) timerEl.innerText = `${m}:${s}`;
+    }
+
+    async function triggerNetworkUpdate() {
+      const spinner = document.getElementById('refreshSpinner');
+      if (spinner) spinner.classList.add('fa-spin');
+
+      try {
+        const res = await fetch('https://tatoeba.org/en/api_v0/search?from=jpn&to=cmn&query=日語&page=1');
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.results && data.results.length > 0) {
+            dynamicPhase4Data = data.results.slice(0, 10).map((item, idx) => ({
+              jp: item.text,
+              tw: item.translations && item.translations[0] ? item.translations[0][0].text : '常見日語表達',
+              scenario: ['日常會話', '旅行溝通', '職場表達'][idx % 3]
+            }));
+          }
+        }
+      } catch (err) {
+        dynamicPhase4Data = [...backupPhase4].sort(() => Math.random() - 0.5);
+      } finally {
+        setTimeout(() => {
+          if (spinner) spinner.classList.remove('fa-spin');
+          if (currentPhase >= 4) renderContent();
+        }, 400);
+      }
+    }
+
+    function renderContent() {
+      const area = document.getElementById('contentArea');
+
+      if (currentPhase <= 3) {
+        const dataMap = { 1: phase1Data, 2: phase2Data, 3: phase3Data };
+        const data = dataMap[currentPhase];
+        
+        area.innerHTML = `
+          <div class="space-y-3">
+            <p id="studyStatus" class="text-xs font-bold text-indigo-700 bg-indigo-50 rounded-xl px-3 py-2" aria-live="polite"></p>
+            <button id="phaseTestButton" onclick="openTestModal(${currentPhase})" class="w-full py-3 bg-indigo-600 active:bg-indigo-700 text-white font-bold text-xs rounded-2xl shadow-md transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-pen-to-square"></i>
+              <span>開始階段 ${currentPhase} 模擬測驗 (20 題)</span>
+            </button>
+            <div class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1.5 sm:gap-2">
+              ${data.map(item => `
+                <div onclick="speak('${item.kana}')" class="p-1.5 sm:p-2 bg-white border border-slate-200 rounded-xl active:scale-95 transition flex flex-col items-center justify-center shadow-xs">
+                  <span class="text-xl sm:text-2xl font-bold text-indigo-600 mb-0.5">${item.kana}</span>
+                  <span class="text-[10px] font-mono text-slate-400 mb-1">${item.romaji}</span>
+                  <span class="text-[10px] font-bold text-slate-700 truncate w-full text-center">${item.word}</span>
+                  <span class="text-[9px] text-slate-400 truncate w-full text-center">${item.meaning}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      } else if (currentPhase === 4) {
+        area.innerHTML = `
+          <div class="space-y-3">
+            <p id="studyStatus" class="text-xs font-bold text-indigo-700 bg-indigo-50 rounded-xl px-3 py-2" aria-live="polite"></p>
+            <button id="phaseTestButton" onclick="openTestModal(4)" class="w-full py-3 bg-indigo-600 active:bg-indigo-700 text-white font-bold text-xs rounded-2xl shadow-md transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-pen-to-square"></i>
+              <span>開始階段 4 會話測驗 (20 題)</span>
+            </button>
+            <div class="space-y-2">
+              ${dynamicPhase4Data.map(item => `
+                <div class="p-3.5 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-2">
+                  <div class="flex items-center justify-between">
+                    <span class="px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[10px] font-bold rounded-md">${item.scenario || '會話'}</span>
+                    <button onclick="speak('${item.jp}')" class="w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs active:scale-90 transition">
+                      <i class="fa-solid fa-volume-high"></i>
+                    </button>
+                  </div>
+                  <p class="text-sm font-bold text-slate-800 leading-snug">${item.jp}</p>
+                  <p class="text-xs text-slate-500">${item.tw}</p>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      } else if (currentPhase === 5) {
+        area.innerHTML = `
+          <div class="space-y-3">
+            <p id="studyStatus" class="text-xs font-bold text-indigo-700 bg-indigo-50 rounded-xl px-3 py-2" aria-live="polite"></p>
+            <button id="phaseTestButton" onclick="openTestModal(5)" class="w-full py-3 bg-indigo-600 active:bg-indigo-700 text-white font-bold text-xs rounded-2xl shadow-md transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-pen-to-square"></i>
+              <span>開始階段 5 語法測驗 (20 題)</span>
+            </button>
+            <div class="space-y-2">
+              ${dynamicPhase5Data.map(item => `
+                <div class="p-3.5 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-2">
+                  <h3 class="text-xs font-bold text-indigo-600">${item.title}</h3>
+                  <div class="p-2 bg-slate-50 border rounded-xl text-[11px] font-mono text-slate-600">${item.formula}</div>
+                  <div class="flex items-center justify-between pt-1">
+                    <p class="text-xs text-slate-700 font-medium">${item.example}</p>
+                    <button onclick="speak('${item.example}')" class="text-indigo-600 text-xs ml-2">
+                      <i class="fa-solid fa-volume-high"></i>
+                    </button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      } else if (currentPhase === 99) {
+        const wrongList = getStoredWrongQuestions();
+        if (wrongList.length === 0) {
+          area.innerHTML = `
+            <div class="text-center py-12 bg-white rounded-2xl border border-slate-200 p-6 space-y-2 shadow-xs">
+              <i class="fa-solid fa-circle-check text-4xl text-emerald-500"></i>
+              <h3 class="text-sm font-bold text-slate-800">目前沒有錯題！</h3>
+              <p class="text-xs text-slate-400">進行階段測驗時答錯的題目會自動記錄於此。</p>
+            </div>
+          `;
+        } else {
+          area.innerHTML = `
+            <div class="space-y-3">
+              <div class="flex items-center justify-between px-1">
+                <span class="text-xs text-slate-500 font-medium">共累積 ${wrongList.length} 題錯題</span>
+                <button onclick="clearWrongQuestions()" class="text-xs text-red-600 font-bold hover:underline">全部清空</button>
+              </div>
+              <div class="space-y-2">
+                ${wrongList.map((item, index) => `
+                  <div class="p-3 bg-red-50/60 border border-red-100 rounded-2xl flex items-center justify-between gap-2 shadow-xs">
+                    <div class="space-y-0.5 flex-1 min-w-0">
+                      <span class="text-[10px] text-red-500 font-bold block truncate">${item.question}</span>
+                      <p class="text-xs font-bold text-slate-800 truncate">正確答案：${item.correctAnswer}</p>
+                    </div>
+                    <div class="flex items-center gap-1 shrink-0">
+                      <button onclick="speak('${item.question.replace(/'/g, "\\'")}')" class="w-7 h-7 rounded-full bg-red-500 text-white flex items-center justify-center text-xs active:scale-90 transition">
+                        <i class="fa-solid fa-volume-high"></i>
+                      </button>
+                      <button onclick="removeSingleWrongQuestion(${index})" class="w-7 h-7 rounded-full bg-white text-slate-400 border border-slate-200 hover:text-red-500 flex items-center justify-center text-xs active:scale-90 transition" title="移除此題">
+                        <i class="fa-solid fa-trash-can"></i>
+                      </button>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `;
+        }
+      }
+    }
+
+    function openTestModal(phase) {
+      if (!phaseUnlocked(phase) || studySeconds(phase) < PHASE_STUDY_HOURS[phase] * 3600) return;
+      activeTestPhase = phase;
+      const modal = document.getElementById('testModal');
+      const title = document.getElementById('modalTitle');
+      title.innerText = `階段 ${phase} 模擬測驗 (20 題)`;
+      
+      testQuestions = generate20Questions(phase);
+      currentQuestionIdx = 0;
+      userScore = 0;
+
+      renderTestQuestion();
+      modal.classList.remove('hidden');
+    }
+
+    function generate20Questions(phase) {
+      let sourcePool = [];
+      if (phase === 1) sourcePool = phase1Data;
+      else if (phase === 2) sourcePool = phase2Data;
+      else if (phase === 3) sourcePool = phase3Data;
+      else if (phase === 4) sourcePool = dynamicPhase4Data;
+      else if (phase === 5) sourcePool = dynamicPhase5Data;
+
+      let questions = [];
+      for (let i = 0; i < 20; i++) {
+        const target = sourcePool[Math.floor(Math.random() * sourcePool.length)];
+        let qText = '', correctAns = '', options = [];
+
+        if (phase <= 3) {
+          qText = `「${target.kana}」的拼音是？`;
+          correctAns = target.romaji;
+          let wrongPool = sourcePool.filter(x => x.romaji !== correctAns).map(x => x.romaji);
+          wrongPool = [...new Set(wrongPool)].sort(() => Math.random() - 0.5).slice(0, 3);
+          options = [correctAns, ...wrongPool].sort(() => Math.random() - 0.5);
+        } else if (phase === 4) {
+          qText = `「${target.jp}」的中文意思是？`;
+          correctAns = target.tw;
+          let wrongPool = backupPhase4.filter(x => x.tw !== correctAns).map(x => x.tw);
+          wrongPool = [...new Set(wrongPool)].sort(() => Math.random() - 0.5).slice(0, 3);
+          options = [correctAns, ...wrongPool].sort(() => Math.random() - 0.5);
+        } else {
+          qText = `「${target.title}」對應的例句？`;
+          correctAns = target.example;
+          let wrongPool = backupPhase5.filter(x => x.example !== correctAns).map(x => x.example);
+          wrongPool = [...new Set(wrongPool)].sort(() => Math.random() - 0.5).slice(0, 3);
+          options = [correctAns, ...wrongPool].sort(() => Math.random() - 0.5);
+        }
+
+        questions.push({ qText, correctAns, options });
+      }
+      return questions;
+    }
+
+    function renderTestQuestion() {
+      const body = document.getElementById('modalBody');
+      const q = testQuestions[currentQuestionIdx];
+
+      body.innerHTML = `
+        <div class="space-y-4">
+          <!-- 進度條 -->
+          <div class="space-y-1">
+            <div class="flex justify-between text-[11px] font-bold text-slate-400">
+              <span>進度：${currentQuestionIdx + 1} / 20</span>
+              <span>得分：${userScore}</span>
+            </div>
+            <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+              <div class="bg-indigo-600 h-full transition-all duration-300" style="width: ${((currentQuestionIdx + 1) / 20) * 100}%"></div>
+            </div>
+          </div>
+
+          <!-- 題目卡片 -->
+          <div class="py-2">
+            <h4 class="text-base font-bold text-slate-800 leading-snug">${q.qText}</h4>
+          </div>
+
+          <!-- 選項按鈕 -->
+          <div class="space-y-2 pt-1">
+            ${q.options.map(opt => `
+              <button onclick="handleAnswer('${opt.replace(/'/g, "\\'")}')" class="w-full p-3.5 bg-slate-50 hover:bg-indigo-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-700 text-left transition active:scale-98 flex items-center justify-between">
+                <span>${opt}</span>
+                <i class="fa-regular fa-circle text-slate-300"></i>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function handleAnswer(selectedOpt) {
+      const q = testQuestions[currentQuestionIdx];
+      if (selectedOpt === q.correctAns) {
+        userScore += 5;
+      } else {
+        saveWrongQuestion({
+          question: q.qText,
+          correctAnswer: q.correctAns
+        });
+      }
+
+      currentQuestionIdx++;
+      if (currentQuestionIdx < 20) {
+        renderTestQuestion();
+      } else {
+        renderFinalResult();
+      }
+    }
+
+    function renderFinalResult() {
+      const body = document.getElementById('modalBody');
+      const isPassed = userScore >= 85;
+      if (isPassed && activeTestPhase) {
+        progress.passed[activeTestPhase] = true;
+        saveProgress();
+        renderTabs();
+      }
+
+      body.innerHTML = `
+        <div class="text-center py-6 space-y-4">
+          <div class="w-16 h-16 ${isPassed ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'} rounded-full flex items-center justify-center text-3xl mx-auto shadow-md">
+            <i class="fa-solid ${isPassed ? 'fa-trophy' : 'fa-circle-xmark'}"></i>
+          </div>
+          <div class="space-y-1">
+            <h3 class="text-xl font-bold text-slate-800">總得分：${userScore} 分</h3>
+            <p class="text-xs text-slate-500">${isPassed ? '🎉 恭喜通過測驗！' : '💪 答錯的題目已存入「錯題本」。'}</p>
+          </div>
+          <div class="pt-2 space-y-2">
+            <button onclick="closeModal()" class="w-full py-3 bg-slate-800 text-white rounded-2xl text-xs font-bold transition">
+              返回練習區
+            </button>
+            <button onclick="switchPhase(99); closeModal();" class="w-full py-3 bg-red-600 text-white rounded-2xl text-xs font-bold transition">
+              查看錯題本
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function getStoredWrongQuestions() {
+      return JSON.parse(localStorage.getItem('jp_app_wrong_questions') || '[]');
+    }
+
+    function saveWrongQuestion(item) {
+      let list = getStoredWrongQuestions();
+      if (!list.some(x => x.question === item.question)) {
+        list.push(item);
+        localStorage.setItem('jp_app_wrong_questions', JSON.stringify(list));
+      }
+    }
+
+    function removeSingleWrongQuestion(index) {
+      let list = getStoredWrongQuestions();
+      list.splice(index, 1);
+      localStorage.setItem('jp_app_wrong_questions', JSON.stringify(list));
+      if (currentPhase === 99) renderContent();
+    }
+
+    function clearWrongQuestions() {
+      localStorage.removeItem('jp_app_wrong_questions');
+      if (currentPhase === 99) renderContent();
+    }
+
+    function speak(text) {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'ja-JP';
+        utterance.rate = 0.9;
+        window.speechSynthesis.speak(utterance);
+      }
+    }
+
+    function closeModal() {
+      document.getElementById('testModal').classList.add('hidden');
+      activeTestPhase = null;
+      renderStudyStatus();
+    }
+
+    function downloadProjectZip() {
+      const zip = new JSZip();
+      const htmlContent = document.documentElement.outerHTML;
+      zip.file("index.html", htmlContent);
+
+      zip.generateAsync({ type: "blob" })
+        .then(function(content) {
+          saveAs(content, "japanese_learning_app.zip");
+        })
+        .catch(function(err) {
+          alert("ZIP 打包失敗：" + err);
+        });
+    }
+  </script>
+</body>
+</html>
