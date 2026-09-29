@@ -73,7 +73,7 @@
         <div id="networkControl" class="hidden flex items-center gap-2 text-xs">
           <span class="text-indigo-200 text-[10px]">內容更新:</span>
           <span id="countdownTimer" class="font-mono font-bold text-amber-300">30:00</span>
-          <button onclick="triggerNetworkUpdate()" class="ml-1 w-6 h-6 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition">
+          <button onclick="triggerNetworkUpdate()" title="手動更新內容" aria-label="手動更新內容" class="ml-1 w-6 h-6 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition">
             <i class="fa-solid fa-arrows-rotate text-[10px]" id="refreshSpinner"></i>
           </button>
         </div>
@@ -159,8 +159,8 @@
     let userScore = 0;
     let answerLocked = false;
     const selectedExamples = { 1: null, 2: null, 3: null };
-    const onlineHints = { 1: null, 2: null, 3: null };
-    const hintRequestIds = { 1: 0, 2: 0, 3: 0 };
+    const exampleSentences = { 1: {}, 2: {}, 3: {} };
+    const exampleRequestIds = { 1: {}, 2: {}, 3: {} };
 
     function escapeHtml(value) {
       return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
@@ -464,25 +464,29 @@
       document.getElementById('phaseTitle').innerText = phaseTitles[phaseId];
 
       const netControl = document.getElementById('networkControl');
+      const countdownTimer = document.getElementById('countdownTimer');
       if (phaseId <= 5) {
         netControl.classList.remove('hidden');
+        countdownTimer.classList.toggle('hidden', phaseId <= 3);
+        netControl.querySelector('span').textContent = phaseId <= 3 ? '字卡手動更新：' : '內容更新：';
+        netControl.querySelector('button').setAttribute('aria-label', phaseId <= 3 ? '手動更新目前字卡例句' : '手動更新內容');
       } else {
         netControl.classList.add('hidden');
       }
 
       renderContent();
       renderStudyStatus();
-      if (phaseId <= 3 && !onlineHints[phaseId]) updateLearningHint(phaseId);
       if ((phaseId === 4 || phaseId === 5) && !hasLoadedOnlineContent[phaseId]) triggerNetworkUpdate();
     }
 
     function startCountdownTimer() {
       if (timerInterval) clearInterval(timerInterval);
       timerInterval = setInterval(() => {
+        if (currentPhase !== 4 && currentPhase !== 5) return;
         timerSeconds--;
         if (timerSeconds <= 0) {
           timerSeconds = 1800;
-          if (!document.hidden && currentPhase <= 5) triggerNetworkUpdate();
+          if (!document.hidden) triggerNetworkUpdate();
         }
         updateTimerDisplay();
       }, 1000);
@@ -510,10 +514,10 @@
     }
 
     async function triggerNetworkUpdate() {
+      if (currentPhase <= 3) return updateSelectedExample(currentPhase);
+      if (currentPhase !== 4 && currentPhase !== 5) return;
       timerSeconds = 1800;
       updateTimerDisplay();
-      if (currentPhase <= 3) return updateLearningHint(currentPhase);
-      if (currentPhase !== 4 && currentPhase !== 5) return;
       const phase = currentPhase;
       const requestId = ++contentRequestId;
       const spinner = document.getElementById('refreshSpinner');
@@ -560,43 +564,51 @@
       }
     }
 
-    async function updateLearningHint(phase) {
-      const requestId = ++hintRequestIds[phase];
-      const data = { 1: phase1Data, 2: phase2Data, 3: phase3Data }[phase];
-      const item = data[Math.floor(Math.random() * data.length)];
-      const spinner = document.getElementById('refreshSpinner');
-      if (currentPhase === phase && spinner) spinner.classList.add('fa-spin');
-      onlineHints[phase] = { jp: item.word, tw: item.meaning, status: '正在取得網路例句…' };
-      renderLearningHint(phase);
+    async function updateSelectedExample(phase) {
+      if (selectedExamples[phase] === null) selectExample(phase, 0, false);
+      const index = selectedExamples[phase];
+      const item = { 1: phase1Data, 2: phase2Data, 3: phase3Data }[phase][index];
+      const requestId = (exampleRequestIds[phase][index] || 0) + 1;
+      exampleRequestIds[phase][index] = requestId;
+      exampleSentences[phase][index] = {
+        ...exampleSentences[phase][index],
+        status: '正在取得日常用語例句…'
+      };
+      renderSelectedExample(phase, index);
       try {
-        const url = `https://tatoeba.org/en/api_v0/search?from=jpn&to=cmn&query=${encodeURIComponent(item.word)}&page=1`;
-        const response = await fetch(url);
-        if (!response.ok) throw new Error('network');
-        const payload = await response.json();
-        const sentence = payload.results?.find(result => result.text && result.translations?.[0]?.[0]?.text);
-        if (!sentence) throw new Error('no result');
-        if (requestId === hintRequestIds[phase]) {
-          onlineHints[phase] = { jp: sentence.text, tw: sentence.translations[0][0].text, status: '網路例句 · Tatoeba' };
+        const keyword = item.word.replace(/[～〜]/g, '');
+        const previous = exampleSentences[phase][index]?.jp;
+        let sentence;
+        for (const page of [1, 2, 3]) {
+          const sentences = await searchDailySentences(keyword, page);
+          sentence = shuffle(sentences).find(entry => entry.jp.includes(keyword) && entry.jp !== previous);
+          if (sentence) break;
         }
+        if (!sentence) throw new Error('no new sentence');
+        if (requestId === exampleRequestIds[phase][index]) exampleSentences[phase][index] = { ...sentence, status: '日常用語例句 · Tatoeba' };
       } catch (_) {
-        if (requestId === hintRequestIds[phase]) onlineHints[phase] = { jp: item.word, tw: item.meaning, status: '目前無法取得網路例句，顯示內建提示' };
-      } finally {
-        if (requestId === hintRequestIds[phase]) {
-          if (spinner && currentPhase === phase) spinner.classList.remove('fa-spin');
-          renderLearningHint(phase);
+        if (requestId === exampleRequestIds[phase][index]) {
+          exampleSentences[phase][index] = {
+            ...exampleSentences[phase][index],
+            status: '目前無法取得新例句，保留原有內容。'
+          };
         }
+      } finally {
+        if (requestId === exampleRequestIds[phase][index]) renderSelectedExample(phase, index);
       }
     }
 
-    function renderLearningHint(phase) {
-      if (currentPhase !== phase) return;
-      const hint = onlineHints[phase];
-      const panel = document.getElementById('learningHint');
-      if (!panel || !hint) return;
-      panel.querySelector('[data-hint-status]').textContent = hint.status;
-      panel.querySelector('[data-hint-jp]').textContent = hint.jp;
-      panel.querySelector('[data-hint-tw]').textContent = hint.tw;
-      panel.querySelector('[data-hint-speak]').onclick = () => speak(hint.jp);
+    function renderSelectedExample(phase, index) {
+      if (currentPhase !== phase || selectedExamples[phase] !== index) return;
+      const panel = document.getElementById('selectedExample');
+      if (!panel) return;
+      const sentence = exampleSentences[phase][index];
+      const sentencePanel = panel.querySelector('[data-example-sentence]');
+      sentencePanel.classList.toggle('hidden', !sentence?.jp);
+      sentencePanel.querySelector('[data-sentence-jp]').textContent = sentence?.jp || '';
+      sentencePanel.querySelector('[data-sentence-tw]').textContent = sentence?.tw || '';
+      sentencePanel.querySelector('[data-sentence-speak]').onclick = () => speak(sentence?.jp || '');
+      panel.querySelector('[data-example-status]').textContent = sentence?.status || '點選更新可取得這個詞彙的日常用語例句。';
     }
 
     function selectExample(phase, index, playSound = true) {
@@ -608,6 +620,7 @@
       panel.querySelector('[data-example-reading]').textContent = item.reading;
       panel.querySelector('[data-example-meaning]').textContent = item.meaning;
       panel.querySelector('[data-example-speak]').onclick = () => speak(item.word);
+      renderSelectedExample(phase, index);
       placeExampleAfterRow(index);
       document.querySelectorAll('[data-kana-index]').forEach(button => {
         const selected = Number(button.dataset.kanaIndex) === index;
@@ -642,7 +655,7 @@
               <i class="fa-solid fa-pen-to-square"></i>
               <span>開始階段 ${currentPhase} 模擬測驗 (20 題)</span>
             </button>
-            <p class="text-xs text-slate-500 px-1">點選假名可聽發音並查看個別範例</p>
+            <p class="text-xs text-slate-500 px-1">點選假名可聽發音並查看常用用語字卡；點選更新可取得該詞彙的日常用語例句。</p>
             <div id="kanaGrid" class="grid grid-cols-5 sm:grid-cols-7 lg:grid-cols-9 gap-1 sm:gap-1.5">
               ${data.map((item, index) => `
                 <button type="button" data-kana-index="${index}" aria-pressed="false" aria-label="${escapeHtml(item.kana)}，${escapeHtml(item.romaji)}，查看範例" class="px-1 py-1.5 bg-white border border-slate-200 rounded-xl active:scale-95 transition flex flex-col items-center justify-center shadow-xs min-h-12">
@@ -652,22 +665,24 @@
               `).join('')}
               <div id="selectedExample" class="hidden bg-white border border-indigo-200 rounded-2xl p-4 shadow-sm space-y-2" style="grid-column: 1 / -1" aria-live="polite">
                 <div class="flex items-center justify-between">
-                  <p class="text-[11px] font-bold text-indigo-600">個別範例</p>
-                  <button type="button" data-example-speak aria-label="播放範例發音" class="text-indigo-600 p-2"><i class="fa-solid fa-volume-high"></i></button>
+                  <p class="text-[11px] font-bold text-indigo-600">常用用語字卡 · 個別範例</p>
+                  <div class="flex items-center gap-1">
+                    <button type="button" onclick="updateSelectedExample(currentPhase)" title="手動更新這張字卡的例句" aria-label="手動更新這張字卡的例句" class="text-indigo-600 p-2"><i class="fa-solid fa-arrows-rotate"></i></button>
+                    <button type="button" data-example-speak aria-label="播放範例發音" class="text-indigo-600 p-2"><i class="fa-solid fa-volume-high"></i></button>
+                  </div>
                 </div>
                 <p data-example-word class="text-lg font-bold text-slate-800"></p>
                 <p data-example-reading class="text-xs text-slate-500"></p>
                 <p data-example-meaning class="text-xs text-slate-700"></p>
+                <div data-example-sentence class="hidden border-t border-slate-100 pt-2 space-y-1">
+                  <div class="flex items-center justify-between gap-2">
+                    <p data-sentence-jp class="text-sm font-medium text-slate-800"></p>
+                    <button type="button" data-sentence-speak aria-label="播放日常用語例句" class="text-indigo-600 p-2"><i class="fa-solid fa-volume-high"></i></button>
+                  </div>
+                  <p data-sentence-tw class="text-xs text-slate-600"></p>
+                </div>
+                <p data-example-status class="text-[10px] text-slate-500"></p>
               </div>
-            </div>
-            <div id="learningHint" class="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 space-y-2" aria-live="polite">
-              <div class="flex items-center justify-between">
-                <p class="text-[11px] font-bold text-indigo-700">30 分鐘更新提示</p>
-                <button type="button" data-hint-speak aria-label="播放提示發音" class="text-indigo-600 p-2"><i class="fa-solid fa-volume-high"></i></button>
-              </div>
-              <p data-hint-jp class="text-sm font-bold text-slate-800"></p>
-              <p data-hint-tw class="text-xs text-slate-600"></p>
-              <p data-hint-status class="text-[10px] text-slate-500"></p>
             </div>
           </div>
         `;
@@ -675,7 +690,6 @@
           button.addEventListener('click', () => selectExample(currentPhase, Number(button.dataset.kanaIndex)));
         });
         if (selectedExamples[currentPhase] !== null) selectExample(currentPhase, selectedExamples[currentPhase], false);
-        renderLearningHint(currentPhase);
       } else if (currentPhase === 4) {
         area.innerHTML = `
           <div class="space-y-3">
