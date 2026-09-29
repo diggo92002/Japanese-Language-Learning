@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <link rel="icon" type="image/png" href="icon.png" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>日文闖關學習系統 - 手機優化版</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -66,8 +66,8 @@
           階段 1
         </span>
         <div id="networkControl" class="hidden flex items-center gap-2 text-xs">
-          <span class="text-indigo-200 text-[10px]">自動更換:</span>
-          <span id="countdownTimer" class="font-mono font-bold text-amber-300">20:00</span>
+          <span class="text-indigo-200 text-[10px]">提示更新:</span>
+          <span id="countdownTimer" class="font-mono font-bold text-amber-300">30:00</span>
           <button onclick="triggerNetworkUpdate()" class="ml-1 w-6 h-6 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition">
             <i class="fa-solid fa-arrows-rotate text-[10px]" id="refreshSpinner"></i>
           </button>
@@ -141,7 +141,7 @@
   <!-- JavaScript 邏輯程式碼 -->
   <script>
     let currentPhase = 1;
-    let timerSeconds = 1200;
+    let timerSeconds = 1800;
     const PHASE_STUDY_HOURS = { 1: 30, 2: 150, 3: 300, 4: 400, 5: 200 };
     const PROGRESS_KEY = 'jp_app_phase_progress_v2';
     let progress = loadProgress();
@@ -152,6 +152,23 @@
     let testQuestions = [];
     let currentQuestionIdx = 0;
     let userScore = 0;
+    let answerLocked = false;
+    const selectedExamples = { 1: null, 2: null, 3: null };
+    const onlineHints = { 1: null, 2: null, 3: null };
+    const hintRequestIds = { 1: 0, 2: 0, 3: 0 };
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
+    }
+
+    function shuffle(items) {
+      const result = [...items];
+      for (let i = result.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [result[i], result[j]] = [result[j], result[i]];
+      }
+      return result;
+    }
 
     // 階段 1：46 清音
     const phase1Data = [
@@ -280,7 +297,8 @@
     const backupPhase5 = [
       { title: '動詞 Te 形 (て形) - 連接與請求', formula: '動詞 1/2/3 類 て形變化', example: 'ちょっと待ってください。(請稍等一下。)' },
       { title: '動詞 Masu 形 (ます形) - 禮貌體', formula: '動詞 + ます / ません / ました', example: '毎日日本語を勉強します。(每天學習日文。)' },
-      { title: '過去式 (た形) - 經驗與完成', formula: '動詞 た形 + ことがあります', example: '日本へ行ったことがあります。(去過日本。)' }
+      { title: '過去式 (た形) - 經驗與完成', formula: '動詞 た形 + ことがあります', example: '日本へ行ったことがあります。(去過日本。)' },
+      { title: '形容詞否定形 - 表達否定', formula: 'い形容詞去掉い + くないです', example: '今日は寒くないです。(今天不冷。)' }
     ];
 
     let dynamicPhase4Data = [...backupPhase4];
@@ -291,6 +309,11 @@
       switchPhase(1);
       startCountdownTimer();
       startStudyTimer();
+      window.addEventListener('resize', () => {
+        if (currentPhase <= 3 && selectedExamples[currentPhase] !== null) {
+          placeExampleAfterRow(selectedExamples[currentPhase]);
+        }
+      });
     });
 
     function loadProgress() {
@@ -303,7 +326,7 @@
     }
 
     function saveProgress() {
-      localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
+      try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress)); } catch (_) { /* Private browsing may block storage. */ }
     }
 
     function phaseUnlocked(phase) {
@@ -335,15 +358,18 @@
 
     function startStudyTimer() {
       let lastTick = Date.now();
+      let lastSaved = Date.now();
       setInterval(() => {
         const now = Date.now();
         const elapsed = Math.min(2, Math.max(0, (now - lastTick) / 1000));
         lastTick = now;
-        if (document.hidden || currentPhase === 99 || !phaseUnlocked(currentPhase) || studySeconds(currentPhase) >= PHASE_STUDY_HOURS[currentPhase] * 3600 || !document.getElementById('testModal').classList.contains('hidden')) return;
+        if (document.hidden || currentPhase === 99 || !phaseUnlocked(currentPhase) || studySeconds(currentPhase) >= PHASE_STUDY_HOURS[currentPhase] * 3600 || !document.getElementById('testModal').classList.contains('hidden') || !document.getElementById('devModal').classList.contains('hidden')) return;
         progress.seconds[currentPhase] = studySeconds(currentPhase) + elapsed;
-        saveProgress();
+        if (now - lastSaved >= 15000) { saveProgress(); lastSaved = now; }
         renderStudyStatus();
       }, 1000);
+      window.addEventListener('pagehide', saveProgress);
+      document.addEventListener('visibilitychange', () => { if (document.hidden) saveProgress(); });
     }
 
     function toggleDevModeModal() {
@@ -402,7 +428,7 @@
       document.getElementById('phaseTitle').innerText = phaseTitles[phaseId];
 
       const netControl = document.getElementById('networkControl');
-      if (phaseId >= 4 && phaseId !== 99) {
+      if (phaseId <= 4) {
         netControl.classList.remove('hidden');
       } else {
         netControl.classList.add('hidden');
@@ -410,6 +436,7 @@
 
       renderContent();
       renderStudyStatus();
+      if (phaseId <= 3 && !onlineHints[phaseId]) updateLearningHint(phaseId);
     }
 
     function startCountdownTimer() {
@@ -417,8 +444,8 @@
       timerInterval = setInterval(() => {
         timerSeconds--;
         if (timerSeconds <= 0) {
-          timerSeconds = 1200;
-          triggerNetworkUpdate();
+          timerSeconds = 1800;
+          if (!document.hidden && currentPhase <= 4) triggerNetworkUpdate();
         }
         updateTimerDisplay();
       }, 1000);
@@ -432,6 +459,10 @@
     }
 
     async function triggerNetworkUpdate() {
+      timerSeconds = 1800;
+      updateTimerDisplay();
+      if (currentPhase <= 3) return updateLearningHint(currentPhase);
+      if (currentPhase !== 4) return;
       const spinner = document.getElementById('refreshSpinner');
       if (spinner) spinner.classList.add('fa-spin');
 
@@ -442,7 +473,7 @@
           if (data && data.results && data.results.length > 0) {
             dynamicPhase4Data = data.results.slice(0, 10).map((item, idx) => ({
               jp: item.text,
-              tw: item.translations && item.translations[0] ? item.translations[0][0].text : '常見日語表達',
+              tw: item.translations?.[0]?.[0]?.text || '常見日語表達',
               scenario: ['日常會話', '旅行溝通', '職場表達'][idx % 3]
             }));
           }
@@ -452,9 +483,77 @@
       } finally {
         setTimeout(() => {
           if (spinner) spinner.classList.remove('fa-spin');
-          if (currentPhase >= 4) renderContent();
+          if (currentPhase === 4) { renderContent(); renderStudyStatus(); }
         }, 400);
       }
+    }
+
+    async function updateLearningHint(phase) {
+      const requestId = ++hintRequestIds[phase];
+      const data = { 1: phase1Data, 2: phase2Data, 3: phase3Data }[phase];
+      const item = data[Math.floor(Math.random() * data.length)];
+      const spinner = document.getElementById('refreshSpinner');
+      if (currentPhase === phase && spinner) spinner.classList.add('fa-spin');
+      onlineHints[phase] = { jp: item.word, tw: item.meaning, status: '正在取得網路例句…' };
+      renderLearningHint(phase);
+      try {
+        const url = `https://tatoeba.org/en/api_v0/search?from=jpn&to=cmn&query=${encodeURIComponent(item.word)}&page=1`;
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('network');
+        const payload = await response.json();
+        const sentence = payload.results?.find(result => result.text && result.translations?.[0]?.[0]?.text);
+        if (!sentence) throw new Error('no result');
+        if (requestId === hintRequestIds[phase]) {
+          onlineHints[phase] = { jp: sentence.text, tw: sentence.translations[0][0].text, status: '網路例句 · Tatoeba' };
+        }
+      } catch (_) {
+        if (requestId === hintRequestIds[phase]) onlineHints[phase] = { jp: item.word, tw: item.meaning, status: '目前無法取得網路例句，顯示內建提示' };
+      } finally {
+        if (requestId === hintRequestIds[phase]) {
+          if (spinner && currentPhase === phase) spinner.classList.remove('fa-spin');
+          renderLearningHint(phase);
+        }
+      }
+    }
+
+    function renderLearningHint(phase) {
+      if (currentPhase !== phase) return;
+      const hint = onlineHints[phase];
+      const panel = document.getElementById('learningHint');
+      if (!panel || !hint) return;
+      panel.querySelector('[data-hint-status]').textContent = hint.status;
+      panel.querySelector('[data-hint-jp]').textContent = hint.jp;
+      panel.querySelector('[data-hint-tw]').textContent = hint.tw;
+      panel.querySelector('[data-hint-speak]').onclick = () => speak(hint.jp);
+    }
+
+    function selectExample(phase, index, playSound = true) {
+      selectedExamples[phase] = index;
+      const item = { 1: phase1Data, 2: phase2Data, 3: phase3Data }[phase][index];
+      const panel = document.getElementById('selectedExample');
+      panel.classList.remove('hidden');
+      panel.querySelector('[data-example-word]').textContent = item.word;
+      panel.querySelector('[data-example-reading]').textContent = item.reading;
+      panel.querySelector('[data-example-meaning]').textContent = item.meaning;
+      panel.querySelector('[data-example-speak]').onclick = () => speak(item.word);
+      placeExampleAfterRow(index);
+      document.querySelectorAll('[data-kana-index]').forEach(button => {
+        const selected = Number(button.dataset.kanaIndex) === index;
+        button.classList.toggle('ring-2', selected);
+        button.classList.toggle('ring-indigo-500', selected);
+        button.setAttribute('aria-pressed', String(selected));
+      });
+      if (playSound) speak(item.kana);
+    }
+
+    function placeExampleAfterRow(index) {
+      const grid = document.getElementById('kanaGrid');
+      const panel = document.getElementById('selectedExample');
+      if (!grid || !panel) return;
+      const cards = grid.querySelectorAll('[data-kana-index]');
+      const columns = getComputedStyle(grid).gridTemplateColumns.split(' ').length;
+      const rowEnd = Math.min(cards.length - 1, Math.floor(index / columns) * columns + columns - 1);
+      cards[rowEnd].after(panel);
     }
 
     function renderContent() {
@@ -471,18 +570,40 @@
               <i class="fa-solid fa-pen-to-square"></i>
               <span>開始階段 ${currentPhase} 模擬測驗 (20 題)</span>
             </button>
-            <div class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1.5 sm:gap-2">
-              ${data.map(item => `
-                <div onclick="speak('${item.kana}')" class="p-1.5 sm:p-2 bg-white border border-slate-200 rounded-xl active:scale-95 transition flex flex-col items-center justify-center shadow-xs">
-                  <span class="text-xl sm:text-2xl font-bold text-indigo-600 mb-0.5">${item.kana}</span>
-                  <span class="text-[10px] font-mono text-slate-400 mb-1">${item.romaji}</span>
-                  <span class="text-[10px] font-bold text-slate-700 truncate w-full text-center">${item.word}</span>
-                  <span class="text-[9px] text-slate-400 truncate w-full text-center">${item.meaning}</span>
-                </div>
+            <p class="text-xs text-slate-500 px-1">點選假名可聽發音並查看個別範例</p>
+            <div id="kanaGrid" class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1.5 sm:gap-2">
+              ${data.map((item, index) => `
+                <button type="button" data-kana-index="${index}" aria-pressed="false" aria-label="${escapeHtml(item.kana)}，${escapeHtml(item.romaji)}，查看範例" class="p-2 bg-white border border-slate-200 rounded-xl active:scale-95 transition flex flex-col items-center justify-center shadow-xs min-h-16">
+                  <span class="text-xl sm:text-2xl font-bold text-indigo-600">${escapeHtml(item.kana)}</span>
+                  <span class="text-[10px] font-mono text-slate-400">${escapeHtml(item.romaji)}</span>
+                </button>
               `).join('')}
+              <div id="selectedExample" class="hidden bg-white border border-indigo-200 rounded-2xl p-4 shadow-sm space-y-2" style="grid-column: 1 / -1" aria-live="polite">
+                <div class="flex items-center justify-between">
+                  <p class="text-[11px] font-bold text-indigo-600">個別範例</p>
+                  <button type="button" data-example-speak aria-label="播放範例發音" class="text-indigo-600 p-2"><i class="fa-solid fa-volume-high"></i></button>
+                </div>
+                <p data-example-word class="text-lg font-bold text-slate-800"></p>
+                <p data-example-reading class="text-xs text-slate-500"></p>
+                <p data-example-meaning class="text-xs text-slate-700"></p>
+              </div>
+            </div>
+            <div id="learningHint" class="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 space-y-2" aria-live="polite">
+              <div class="flex items-center justify-between">
+                <p class="text-[11px] font-bold text-indigo-700">30 分鐘更新提示</p>
+                <button type="button" data-hint-speak aria-label="播放提示發音" class="text-indigo-600 p-2"><i class="fa-solid fa-volume-high"></i></button>
+              </div>
+              <p data-hint-jp class="text-sm font-bold text-slate-800"></p>
+              <p data-hint-tw class="text-xs text-slate-600"></p>
+              <p data-hint-status class="text-[10px] text-slate-500"></p>
             </div>
           </div>
         `;
+        area.querySelectorAll('[data-kana-index]').forEach(button => {
+          button.addEventListener('click', () => selectExample(currentPhase, Number(button.dataset.kanaIndex)));
+        });
+        if (selectedExamples[currentPhase] !== null) selectExample(currentPhase, selectedExamples[currentPhase], false);
+        renderLearningHint(currentPhase);
       } else if (currentPhase === 4) {
         area.innerHTML = `
           <div class="space-y-3">
@@ -492,21 +613,24 @@
               <span>開始階段 4 會話測驗 (20 題)</span>
             </button>
             <div class="space-y-2">
-              ${dynamicPhase4Data.map(item => `
+              ${dynamicPhase4Data.map((item, index) => `
                 <div class="p-3.5 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-2">
                   <div class="flex items-center justify-between">
-                    <span class="px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[10px] font-bold rounded-md">${item.scenario || '會話'}</span>
-                    <button onclick="speak('${item.jp}')" class="w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs active:scale-90 transition">
+                    <span class="px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[10px] font-bold rounded-md">${escapeHtml(item.scenario || '會話')}</span>
+                    <button data-speak-index="${index}" aria-label="播放日語例句" class="w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs active:scale-90 transition">
                       <i class="fa-solid fa-volume-high"></i>
                     </button>
                   </div>
-                  <p class="text-sm font-bold text-slate-800 leading-snug">${item.jp}</p>
-                  <p class="text-xs text-slate-500">${item.tw}</p>
+                  <p class="text-sm font-bold text-slate-800 leading-snug">${escapeHtml(item.jp)}</p>
+                  <p class="text-xs text-slate-500">${escapeHtml(item.tw)}</p>
                 </div>
               `).join('')}
             </div>
           </div>
         `;
+        area.querySelectorAll('[data-speak-index]').forEach(button => {
+          button.addEventListener('click', () => speak(dynamicPhase4Data[Number(button.dataset.speakIndex)].jp));
+        });
       } else if (currentPhase === 5) {
         area.innerHTML = `
           <div class="space-y-3">
@@ -552,11 +676,11 @@
                 ${wrongList.map((item, index) => `
                   <div class="p-3 bg-red-50/60 border border-red-100 rounded-2xl flex items-center justify-between gap-2 shadow-xs">
                     <div class="space-y-0.5 flex-1 min-w-0">
-                      <span class="text-[10px] text-red-500 font-bold block truncate">${item.question}</span>
-                      <p class="text-xs font-bold text-slate-800 truncate">正確答案：${item.correctAnswer}</p>
+                      <span class="text-[10px] text-red-500 font-bold block truncate">${escapeHtml(item.question)}</span>
+                      <p class="text-xs font-bold text-slate-800 truncate">正確答案：${escapeHtml(item.correctAnswer)}</p>
                     </div>
                     <div class="flex items-center gap-1 shrink-0">
-                      <button onclick="speak('${item.question.replace(/'/g, "\\'")}')" class="w-7 h-7 rounded-full bg-red-500 text-white flex items-center justify-center text-xs active:scale-90 transition">
+                      <button data-wrong-speak-index="${index}" aria-label="播放錯題" class="w-7 h-7 rounded-full bg-red-500 text-white flex items-center justify-center text-xs active:scale-90 transition">
                         <i class="fa-solid fa-volume-high"></i>
                       </button>
                       <button onclick="removeSingleWrongQuestion(${index})" class="w-7 h-7 rounded-full bg-white text-slate-400 border border-slate-200 hover:text-red-500 flex items-center justify-center text-xs active:scale-90 transition" title="移除此題">
@@ -568,6 +692,9 @@
               </div>
             </div>
           `;
+          area.querySelectorAll('[data-wrong-speak-index]').forEach(button => {
+            button.addEventListener('click', () => speak(wrongList[Number(button.dataset.wrongSpeakIndex)].question));
+          });
         }
       }
     }
@@ -582,6 +709,7 @@
       testQuestions = generate20Questions(phase);
       currentQuestionIdx = 0;
       userScore = 0;
+      answerLocked = false;
 
       renderTestQuestion();
       modal.classList.remove('hidden');
@@ -596,28 +724,27 @@
       else if (phase === 5) sourcePool = dynamicPhase5Data;
 
       let questions = [];
+      const targets = shuffle(sourcePool);
       for (let i = 0; i < 20; i++) {
-        const target = sourcePool[Math.floor(Math.random() * sourcePool.length)];
+        const target = targets[i % targets.length];
         let qText = '', correctAns = '', options = [];
 
         if (phase <= 3) {
           qText = `「${target.kana}」的拼音是？`;
           correctAns = target.romaji;
           let wrongPool = sourcePool.filter(x => x.romaji !== correctAns).map(x => x.romaji);
-          wrongPool = [...new Set(wrongPool)].sort(() => Math.random() - 0.5).slice(0, 3);
-          options = [correctAns, ...wrongPool].sort(() => Math.random() - 0.5);
+          wrongPool = shuffle([...new Set(wrongPool)]).slice(0, 3);
+          options = shuffle([correctAns, ...wrongPool]);
         } else if (phase === 4) {
           qText = `「${target.jp}」的中文意思是？`;
           correctAns = target.tw;
-          let wrongPool = backupPhase4.filter(x => x.tw !== correctAns).map(x => x.tw);
-          wrongPool = [...new Set(wrongPool)].sort(() => Math.random() - 0.5).slice(0, 3);
-          options = [correctAns, ...wrongPool].sort(() => Math.random() - 0.5);
+          let wrongPool = [...new Set([...sourcePool, ...backupPhase4].filter(x => x.tw !== correctAns).map(x => x.tw))];
+          options = shuffle([correctAns, ...shuffle(wrongPool).slice(0, 3)]);
         } else {
           qText = `「${target.title}」對應的例句？`;
           correctAns = target.example;
-          let wrongPool = backupPhase5.filter(x => x.example !== correctAns).map(x => x.example);
-          wrongPool = [...new Set(wrongPool)].sort(() => Math.random() - 0.5).slice(0, 3);
-          options = [correctAns, ...wrongPool].sort(() => Math.random() - 0.5);
+          let wrongPool = [...new Set([...sourcePool, ...backupPhase5].filter(x => x.example !== correctAns).map(x => x.example))];
+          options = shuffle([correctAns, ...shuffle(wrongPool).slice(0, 3)]);
         }
 
         questions.push({ qText, correctAns, options });
@@ -644,23 +771,31 @@
 
           <!-- 題目卡片 -->
           <div class="py-2">
-            <h4 class="text-base font-bold text-slate-800 leading-snug">${q.qText}</h4>
+            <h4 class="text-base font-bold text-slate-800 leading-snug">${escapeHtml(q.qText)}</h4>
           </div>
 
           <!-- 選項按鈕 -->
           <div class="space-y-2 pt-1">
-            ${q.options.map(opt => `
-              <button onclick="handleAnswer('${opt.replace(/'/g, "\\'")}')" class="w-full p-3.5 bg-slate-50 hover:bg-indigo-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-700 text-left transition active:scale-98 flex items-center justify-between">
-                <span>${opt}</span>
+            ${q.options.map((opt, index) => `
+              <button data-answer-index="${index}" class="w-full p-3.5 bg-slate-50 hover:bg-indigo-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-700 text-left transition active:scale-98 flex items-center justify-between">
+                <span>${escapeHtml(opt)}</span>
                 <i class="fa-regular fa-circle text-slate-300"></i>
               </button>
             `).join('')}
           </div>
+          <p id="answerFeedback" class="text-xs font-bold min-h-5" aria-live="polite"></p>
+          <button id="nextQuestionButton" class="hidden w-full p-3 bg-indigo-600 text-white rounded-xl text-xs font-bold">下一題</button>
         </div>
       `;
+      body.querySelectorAll('[data-answer-index]').forEach(button => {
+        button.addEventListener('click', () => handleAnswer(q.options[Number(button.dataset.answerIndex)]));
+      });
+      body.querySelector('#nextQuestionButton').addEventListener('click', nextQuestion);
     }
 
     function handleAnswer(selectedOpt) {
+      if (answerLocked) return;
+      answerLocked = true;
       const q = testQuestions[currentQuestionIdx];
       if (selectedOpt === q.correctAns) {
         userScore += 5;
@@ -671,6 +806,24 @@
         });
       }
 
+      const buttons = document.querySelectorAll('#modalBody [data-answer-index]');
+      buttons.forEach(button => {
+        button.disabled = true;
+        const value = q.options[Number(button.dataset.answerIndex)];
+        if (value === q.correctAns) button.classList.add('border-emerald-500', 'bg-emerald-50');
+        else if (value === selectedOpt) button.classList.add('border-red-500', 'bg-red-50');
+      });
+      const feedback = document.getElementById('answerFeedback');
+      feedback.textContent = selectedOpt === q.correctAns ? '答對了！' : `答錯了，正確答案：${q.correctAns}`;
+      feedback.classList.add(selectedOpt === q.correctAns ? 'text-emerald-700' : 'text-red-700');
+      const next = document.getElementById('nextQuestionButton');
+      next.textContent = currentQuestionIdx === 19 ? '查看成績' : '下一題';
+      next.classList.remove('hidden');
+    }
+
+    function nextQuestion() {
+      if (!answerLocked) return;
+      answerLocked = false;
       currentQuestionIdx++;
       if (currentQuestionIdx < 20) {
         renderTestQuestion();
@@ -710,14 +863,17 @@
     }
 
     function getStoredWrongQuestions() {
-      return JSON.parse(localStorage.getItem('jp_app_wrong_questions') || '[]');
+      try {
+        const list = JSON.parse(localStorage.getItem('jp_app_wrong_questions') || '[]');
+        return Array.isArray(list) ? list : [];
+      } catch (_) { return []; }
     }
 
     function saveWrongQuestion(item) {
       let list = getStoredWrongQuestions();
       if (!list.some(x => x.question === item.question)) {
         list.push(item);
-        localStorage.setItem('jp_app_wrong_questions', JSON.stringify(list));
+        try { localStorage.setItem('jp_app_wrong_questions', JSON.stringify(list)); } catch (_) { /* Keep the test usable. */ }
       }
     }
 
