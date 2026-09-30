@@ -40,7 +40,7 @@
         </div>
         <div>
           <h1 class="font-bold text-base text-slate-800 leading-none">日文闖關學習</h1>
-          <p class="text-[10px] text-slate-400 mt-0.5">隨機測驗 & 動態錯題本</p>
+          <p class="text-[10px] text-slate-400 mt-0.5">隨機測驗 & 複習區</p>
         </div>
       </div>
       
@@ -76,7 +76,7 @@
         <div id="networkControl" class="hidden flex items-center gap-2 text-xs">
           <span id="updateLabel" class="text-indigo-200 text-[10px]">字卡手動更新:</span>
           <span id="countdownTimer" class="hidden font-mono font-bold text-amber-300">30:00</span>
-          <button onclick="triggerNetworkUpdate()" title="手動更新內容" aria-label="手動更新內容" class="ml-1 w-6 h-6 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition">
+          <button onclick="triggerNetworkUpdate()" title="手動更新核心單字與例句應用" aria-label="手動更新核心單字與例句應用" class="ml-1 w-6 h-6 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition">
             <i class="fa-solid fa-arrows-rotate text-[10px]" id="refreshSpinner"></i>
           </button>
         </div>
@@ -107,7 +107,7 @@
             <i class="fa-solid fa-clock text-amber-500"></i>
           </button>
           <button onclick="clearWrongQuestions(); toggleDevModeModal();" class="p-3 bg-red-50 hover:bg-red-100 text-red-800 rounded-xl font-medium text-left flex items-center justify-between">
-            <span>🗑️ 清空所有錯題記錄</span>
+            <span>🗑️ 清空複習區紀錄</span>
             <i class="fa-solid fa-trash text-red-500"></i>
           </button>
         </div>
@@ -160,8 +160,8 @@
     let userScore = 0;
     let answerLocked = false;
     const selectedExamples = { 1: null, 2: null, 3: null };
-    const exampleSentences = { 1: {}, 2: {}, 3: {} };
-    const exampleRequestIds = { 1: {}, 2: {}, 3: {} };
+    const cardApplications = { 1: {}, 2: {}, 3: {} };
+    const applicationRequestIds = { 1: {}, 2: {}, 3: {} };
 
     function escapeHtml(value) {
       return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
@@ -434,7 +434,7 @@
         { id: 3, name: '階段 3', desc: '中級文法 · 300h' },
         { id: 4, name: '階段 4', desc: '實戰表達 · 400h' },
         { id: 5, name: '階段 5', desc: '綜合沉浸 · 200h' },
-        { id: 99, name: '錯題本', desc: '弱點' }
+        { id: 99, name: '複習區', desc: '錯題複習' }
       ];
 
       const container = document.getElementById('phaseTabContainer');
@@ -458,7 +458,7 @@
         3: '階段 3：中級文法與詞彙 N3～N2 · 300 小時',
         4: '階段 4：實戰應用與表達 · 400 小時',
         5: '階段 5：綜合測驗與生活沉浸 · 200 小時',
-        99: '錯題本：個人弱點強化複習'
+        99: '複習區：個人弱點強化練習'
       };
 
       document.getElementById('phaseBadge').innerText = phaseId === 99 ? '弱點' : `階段 ${phaseId}`;
@@ -467,16 +467,14 @@
       const netControl = document.getElementById('networkControl');
       const countdownTimer = document.getElementById('countdownTimer');
       const updateLabel = document.getElementById('updateLabel');
+      const updateButton = netControl.querySelector('button');
       
-      if (phaseId <= 5) {
+      if (phaseId === 4 || phaseId === 5) {
         netControl.classList.remove('hidden');
-        if (phaseId <= 3) {
-          countdownTimer.classList.add('hidden');
-          updateLabel.textContent = '字卡手動更新:';
-        } else {
-          countdownTimer.classList.remove('hidden');
-          updateLabel.textContent = '內容更新:';
-        }
+        countdownTimer.classList.remove('hidden');
+        updateLabel.textContent = '內容更新:';
+        updateButton.title = '手動更新內容';
+        updateButton.setAttribute('aria-label', updateButton.title);
       } else {
         netControl.classList.add('hidden');
       }
@@ -508,16 +506,20 @@
 
     async function searchDailySentences(query, page = 1) {
       const targetUrl = `https://tatoeba.org/en/api_v0/search?from=jpn&to=cmn&query=${encodeURIComponent(query)}&page=${page}`;
-      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
+      const readerUrl = `https://r.jina.ai/http://${targetUrl.slice('https://'.length).replaceAll('&', '%26')}`;
       
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
 
       try {
-        const response = await fetch(proxyUrl, { signal: controller.signal });
+        const response = await fetch(readerUrl, { signal: controller.signal });
         clearTimeout(timeoutId);
         if (!response.ok) throw new Error('network error');
-        const payload = await response.json();
+        const readerText = await response.text();
+        const contentMarker = 'Markdown Content:';
+        const contentStart = readerText.indexOf(contentMarker);
+        if (contentStart === -1) throw new Error('invalid reader response');
+        const payload = JSON.parse(readerText.slice(contentStart + contentMarker.length).trim());
         return (payload.results || []).flatMap(item => {
           const translations = (item.translations || []).flat();
           const translation = translations.find(entry => entry?.lang === 'cmn' && entry.text);
@@ -533,18 +535,13 @@
 
     // 統一的更新觸發點（對應截圖中的更新定義）
     async function triggerNetworkUpdate() {
+      if (currentPhase <= 3) {
+        if (selectedExamples[currentPhase] === null) selectExample(currentPhase, 0, false);
+        return updateDailyVocabulary(currentPhase);
+      }
+
       const spinner = document.getElementById('refreshSpinner');
       if (spinner) spinner.classList.add('fa-spin');
-
-      if (currentPhase <= 3) {
-        // 階段 1~3：點擊頂部或卡片更新，重新整理當前選中的字卡例句
-        if (selectedExamples[currentPhase] === null) {
-          selectExample(currentPhase, 0, false);
-        }
-        await updateSelectedExample(currentPhase);
-        if (spinner) spinner.classList.remove('fa-spin');
-        return;
-      }
 
       if (currentPhase !== 4 && currentPhase !== 5) {
         if (spinner) spinner.classList.remove('fa-spin');
@@ -572,7 +569,7 @@
           if (sentences.length >= 3) {
             dynamicPhase4Data = shuffle(sentences).slice(0, 5).map(item => ({ ...item, scenario: '網路日常例句' }));
             hasLoadedOnlineContent[phase] = true;
-            contentUpdateStatus[phase] = '網路例句來源：Tatoeba (透過代理成功)';
+            contentUpdateStatus[phase] = '網路例句來源：Tatoeba（透過 Jina Reader）';
           } else {
             dynamicPhase4Data = shuffle(backupPhase4).slice(0, 5);
             contentUpdateStatus[phase] = '已隨機切換內建實戰會話庫。';
@@ -593,7 +590,7 @@
           if (online.length >= 2) {
             dynamicPhase5Data = online;
             hasLoadedOnlineContent[phase] = true;
-            contentUpdateStatus[phase] = '網路語法例句來源：Tatoeba';
+            contentUpdateStatus[phase] = '網路語法例句來源：Tatoeba（透過 Jina Reader）';
           } else {
             dynamicPhase5Data = shuffle(backupPhase5).slice(0, 4);
             contentUpdateStatus[phase] = '已隨機切換內建綜合文法庫。';
@@ -614,64 +611,89 @@
       }
     }
 
-    async function updateSelectedExample(phase) {
-      if (selectedExamples[phase] === null) selectExample(phase, 0, false);
-      const index = selectedExamples[phase];
-      const item = { 1: phase1Data, 2: phase2Data, 3: phase3Data }[phase][index];
-      const requestId = (exampleRequestIds[phase][index] || 0) + 1;
-      exampleRequestIds[phase][index] = requestId;
-      exampleSentences[phase][index] = {
-        ...exampleSentences[phase][index],
-        status: '正在取得日常用語例句…'
+    const applicationOverrides = {
+      '朝': { jp: '朝ご飯を食べます。', tw: '我吃早餐。', usage: '說明早晨的日常作息。' },
+      '犬': { jp: '犬と散歩します。', tw: '我帶狗散步。', usage: '談論和寵物的日常活動。' },
+      '海': { jp: '夏に海へ行きます。', tw: '夏天要去海邊。', usage: '談論旅遊或假日安排。' },
+      '駅': { jp: '駅はどこですか。', tw: '車站在哪裡？', usage: '問路時使用。' },
+      'お茶': { jp: 'お茶をください。', tw: '請給我茶。', usage: '點飲料時使用。' },
+      '傘': { jp: '傘を持って行きます。', tw: '我會帶傘去。', usage: '下雨前的準備。' },
+      '車': { jp: '車で会社に行きます。', tw: '我開車去公司。', usage: '說明交通方式。' },
+      '友達': { jp: '友達と会います。', tw: '我要和朋友見面。', usage: '說明約人的安排。' },
+      '電車': { jp: '電車が来ました。', tw: '電車來了。', usage: '搭乘大眾運輸時使用。' },
+      '病院': { jp: '午後、病院に行きます。', tw: '下午要去醫院。', usage: '說明就醫安排。' },
+      '勉強': { jp: '毎晩、日本語を勉強します。', tw: '我每晚學日文。', usage: '談論學習習慣。' },
+      'パン': { jp: 'パンを二つください。', tw: '請給我兩個麵包。', usage: '購買麵包時使用。' },
+      'ペン': { jp: 'このペンを使ってもいいですか。', tw: '可以用這支筆嗎？', usage: '借用物品時使用。' },
+      '今日': { jp: '今日は忙しいです。', tw: '今天很忙。', usage: '談論今天的狀況。' },
+      '宿題': { jp: '宿題はもう終わりました。', tw: '作業已經做完了。', usage: '談論課業進度。' },
+      '旅行': { jp: '来月、日本へ旅行します。', tw: '下個月要去日本旅行。', usage: '談論旅行計畫。' },
+      '授業': { jp: '授業は九時に始まります。', tw: '課程九點開始。', usage: '確認上課時間。' }
+    };
+
+    function selectedKanaItem(phase) {
+      const data = { 1: phase1Data, 2: phase2Data, 3: phase3Data }[phase];
+      return data[selectedExamples[phase]];
+    }
+
+    function defaultApplication(item) {
+      return applicationOverrides[item.word] || {
+        jp: `「${item.word}」を使って、短い文を作ってみましょう。`,
+        tw: `試著使用「${item.meaning}」造一個短句。`,
+        usage: '先記住讀音，再用這個詞彙造句。'
       };
-      renderSelectedExample(phase, index);
+    }
+
+    async function updateDailyVocabulary(phase) {
+      const index = selectedExamples[phase];
+      const item = selectedKanaItem(phase);
+      const requestId = (applicationRequestIds[phase][index] || 0) + 1;
+      applicationRequestIds[phase][index] = requestId;
+      cardApplications[phase][index] = { ...defaultApplication(item), status: '正在更新這個發音對應的日常例句…' };
+      renderDailyVocabulary(phase);
+
+      const spinner = document.getElementById('refreshSpinner');
+      if (spinner) spinner.classList.add('fa-spin');
       try {
         const keyword = item.word.replace(/[～〜]/g, '');
-        const previous = exampleSentences[phase][index]?.jp;
-        let sentence;
-        for (const page of [1, 2, 3]) {
-          const sentences = await searchDailySentences(keyword, page);
-          sentence = shuffle(sentences).find(entry => entry.jp.includes(keyword) && entry.jp !== previous);
-          if (sentence) break;
+        const sentences = await searchDailySentences(keyword);
+        const sentence = shuffle(sentences).find(entry => entry.jp.includes(keyword));
+        if (!sentence) throw new Error('no matching sentence');
+        if (requestId === applicationRequestIds[phase][index]) {
+          cardApplications[phase][index] = { ...sentence, usage: `以「${item.meaning}」為主題的日常用語。`, status: '網路例句來源：Tatoeba（透過 Jina Reader）' };
         }
-        if (!sentence) throw new Error('no new sentence');
-        if (requestId === exampleRequestIds[phase][index]) exampleSentences[phase][index] = { ...sentence, status: '日常用語例句 · Tatoeba' };
       } catch (_) {
-        if (requestId === exampleRequestIds[phase][index]) {
-          exampleSentences[phase][index] = {
-            jp: `これは${item.word}です。`,
-            tw: `這是${item.meaning}。`,
-            status: '已切換至該詞彙的實用基礎例句。'
-          };
+        if (requestId === applicationRequestIds[phase][index]) {
+          cardApplications[phase][index] = { ...defaultApplication(item), status: '目前無法取得新例句，保留預設日常用語。' };
         }
       } finally {
-        if (requestId === exampleRequestIds[phase][index]) renderSelectedExample(phase, index);
+        if (spinner) spinner.classList.remove('fa-spin');
+        if (requestId === applicationRequestIds[phase][index]) renderDailyVocabulary(phase);
       }
     }
 
-    function renderSelectedExample(phase, index) {
-      if (currentPhase !== phase || selectedExamples[phase] !== index) return;
+    function renderDailyVocabulary(phase) {
+      if (currentPhase !== phase) return;
       const panel = document.getElementById('selectedExample');
       if (!panel) return;
-      const sentence = exampleSentences[phase][index];
-      const sentencePanel = panel.querySelector('[data-example-sentence]');
-      sentencePanel.classList.toggle('hidden', !sentence?.jp);
-      sentencePanel.querySelector('[data-sentence-jp]').textContent = sentence?.jp || '';
-      sentencePanel.querySelector('[data-sentence-tw]').textContent = sentence?.tw || '';
-      sentencePanel.querySelector('[data-sentence-speak]').onclick = () => speak(sentence?.jp || '');
-      panel.querySelector('[data-example-status]').textContent = sentence?.status || '點選更新可取得這個詞彙的日常用語例句。';
+      const item = selectedKanaItem(phase);
+      const application = cardApplications[phase][selectedExamples[phase]] || defaultApplication(item);
+      panel.querySelector('[data-core-word]').textContent = item.word;
+      panel.querySelector('[data-core-reading]').textContent = item.reading;
+      panel.querySelector('[data-core-meaning]').textContent = item.meaning;
+      panel.querySelector('[data-core-speak]').onclick = () => speak(item.word);
+      panel.querySelector('[data-application-example]').textContent = application.jp;
+      panel.querySelector('[data-application-translation]').textContent = application.tw;
+      panel.querySelector('[data-application-usage]').textContent = `應用：${application.usage}`;
+      panel.querySelector('[data-application-speak]').onclick = () => speak(application.jp);
+      panel.querySelector('[data-application-status]').textContent = application.status || '預設日常用語例句。';
     }
 
     function selectExample(phase, index, playSound = true) {
       selectedExamples[phase] = index;
-      const item = { 1: phase1Data, 2: phase2Data, 3: phase3Data }[phase][index];
       const panel = document.getElementById('selectedExample');
       panel.classList.remove('hidden');
-      panel.querySelector('[data-example-word]').textContent = item.word;
-      panel.querySelector('[data-example-reading]').textContent = item.reading;
-      panel.querySelector('[data-example-meaning]').textContent = item.meaning;
-      panel.querySelector('[data-example-speak]').onclick = () => speak(item.word);
-      renderSelectedExample(phase, index);
+      renderDailyVocabulary(phase);
       placeExampleAfterRow(index);
       document.querySelectorAll('[data-kana-index]').forEach(button => {
         const selected = Number(button.dataset.kanaIndex) === index;
@@ -679,7 +701,7 @@
         button.classList.toggle('ring-indigo-500', selected);
         button.setAttribute('aria-pressed', String(selected));
       });
-      if (playSound) speak(item.kana);
+      if (playSound) speak(({ 1: phase1Data, 2: phase2Data, 3: phase3Data }[phase][index]).kana);
     }
 
     function placeExampleAfterRow(index) {
@@ -706,33 +728,38 @@
               <i class="fa-solid fa-pen-to-square"></i>
               <span>開始階段 ${currentPhase} 模擬測驗 (20 題)</span>
             </button>
-            <p class="text-xs text-slate-500 px-1">點選假名可聽發音並查看常用用語字卡；點選更新可取得該詞彙的日常用語例句。</p>
+            <p class="text-xs text-slate-500 px-1">點選假名可聽發音；下方常用用語字卡會顯示核心單字與例句應用。</p>
             <div id="kanaGrid" class="grid grid-cols-5 sm:grid-cols-7 lg:grid-cols-9 gap-1 sm:gap-1.5">
               ${data.map((item, index) => `
-                <button type="button" data-kana-index="${index}" aria-pressed="false" aria-label="${escapeHtml(item.kana)}，${escapeHtml(item.romaji)}，查看範例" class="px-1 py-1.5 bg-white border border-slate-200 rounded-xl active:scale-95 transition flex flex-col items-center justify-center shadow-xs min-h-12">
+                <button type="button" data-kana-index="${index}" aria-pressed="false" aria-label="${escapeHtml(item.kana)}，${escapeHtml(item.romaji)}，查看對應單字" class="px-1 py-1.5 bg-white border border-slate-200 rounded-xl active:scale-95 transition flex flex-col items-center justify-center shadow-xs min-h-12">
                   <span class="text-lg sm:text-xl font-bold text-indigo-600">${escapeHtml(item.kana)}</span>
                   <span class="text-[10px] font-mono text-slate-400">${escapeHtml(item.romaji)}</span>
                 </button>
               `).join('')}
-              <div id="selectedExample" class="hidden bg-white border border-indigo-200 rounded-2xl p-4 shadow-sm space-y-2" style="grid-column: 1 / -1" aria-live="polite">
+              <div id="selectedExample" class="hidden bg-white border border-indigo-200 rounded-2xl p-4 shadow-sm space-y-3" style="grid-column: 1 / -1" aria-live="polite">
                 <div class="flex items-center justify-between">
-                  <p class="text-[11px] font-bold text-indigo-600">常用用語字卡 · 個別範例</p>
-                  <div class="flex items-center gap-1">
-                    <button type="button" onclick="updateSelectedExample(currentPhase)" title="手動更新這張字卡的例句" aria-label="手動更新這張字卡的例句" class="text-indigo-600 p-2"><i class="fa-solid fa-arrows-rotate"></i></button>
-                    <button type="button" data-example-speak aria-label="播放範例發音" class="text-indigo-600 p-2"><i class="fa-solid fa-volume-high"></i></button>
-                  </div>
+                  <p class="text-[11px] font-bold text-indigo-600">常用用語字卡</p>
+                  <button type="button" onclick="updateDailyVocabulary(currentPhase)" class="rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100" aria-label="更新核心單字及例句與應用">手動更新</button>
                 </div>
-                <p data-example-word class="text-lg font-bold text-slate-800"></p>
-                <p data-example-reading class="text-xs text-slate-500"></p>
-                <p data-example-meaning class="text-xs text-slate-700"></p>
-                <div data-example-sentence class="hidden border-t border-slate-100 pt-2 space-y-1">
+                <section class="rounded-xl bg-slate-50 p-3 space-y-1" aria-label="核心單字區">
                   <div class="flex items-center justify-between gap-2">
-                    <p data-sentence-jp class="text-sm font-medium text-slate-800"></p>
-                    <button type="button" data-sentence-speak aria-label="播放日常用語例句" class="text-indigo-600 p-2"><i class="fa-solid fa-volume-high"></i></button>
+                    <h4 class="text-[11px] font-bold text-slate-500">核心單字區</h4>
+                    <button type="button" data-core-speak aria-label="播放核心單字" class="text-indigo-600 p-1"><i class="fa-solid fa-volume-high"></i></button>
                   </div>
-                  <p data-sentence-tw class="text-xs text-slate-600"></p>
-                </div>
-                <p data-example-status class="text-[10px] text-slate-500"></p>
+                  <p data-core-word class="text-lg font-bold text-slate-800"></p>
+                  <p data-core-reading class="text-xs text-slate-500"></p>
+                  <p data-core-meaning class="text-xs text-slate-700"></p>
+                </section>
+                <section class="rounded-xl bg-indigo-50 p-3 space-y-1" aria-label="例句與應用區">
+                  <div class="flex items-center justify-between gap-2">
+                    <h4 class="text-[11px] font-bold text-indigo-700">例句與應用區</h4>
+                    <button type="button" data-application-speak aria-label="播放例句" class="text-indigo-600 p-1"><i class="fa-solid fa-volume-high"></i></button>
+                  </div>
+                  <p data-application-example class="text-sm font-medium text-slate-800"></p>
+                  <p data-application-translation class="text-xs text-slate-700"></p>
+                  <p data-application-usage class="text-xs text-slate-500"></p>
+                  <p data-application-status class="text-[10px] text-slate-500"></p>
+                </section>
               </div>
             </div>
           </div>
@@ -740,7 +767,9 @@
         area.querySelectorAll('[data-kana-index]').forEach(button => {
           button.addEventListener('click', () => selectExample(currentPhase, Number(button.dataset.kanaIndex)));
         });
-        if (selectedExamples[currentPhase] !== null) selectExample(currentPhase, selectedExamples[currentPhase], false);
+        if (selectedExamples[currentPhase] !== null) {
+          selectExample(currentPhase, selectedExamples[currentPhase], false);
+        }
       } else if (currentPhase === 4) {
         area.innerHTML = `
           <div class="space-y-3">
@@ -803,15 +832,15 @@
           area.innerHTML = `
             <div class="text-center py-12 bg-white rounded-2xl border border-slate-200 p-6 space-y-2 shadow-xs">
               <i class="fa-solid fa-circle-check text-4xl text-emerald-500"></i>
-              <h3 class="text-sm font-bold text-slate-800">目前沒有錯題！</h3>
-              <p class="text-xs text-slate-400">進行階段測驗時答錯的題目會自動記錄於此。</p>
+              <h3 class="text-sm font-bold text-slate-800">目前沒有需要複習的題目！</h3>
+              <p class="text-xs text-slate-400">階段測驗中答錯的題目會自動加入複習區。</p>
             </div>
           `;
         } else {
           area.innerHTML = `
             <div class="space-y-3">
               <div class="flex items-center justify-between px-1">
-                <span class="text-xs text-slate-500 font-medium">共累積 ${wrongList.length} 題錯題</span>
+                <span class="text-xs text-slate-500 font-medium">共有 ${wrongList.length} 題待複習題目</span>
                 <button onclick="clearWrongQuestions()" class="text-xs text-red-600 font-bold hover:underline">全部清空</button>
               </div>
               <div class="space-y-2">
@@ -985,14 +1014,14 @@
           </div>
           <div class="space-y-1">
             <h3 class="text-xl font-bold text-slate-800">總得分：${userScore} 分</h3>
-            <p class="text-xs text-slate-500">${isPassed ? '🎉 恭喜通過測驗！' : '💪 答錯的題目已存入「錯題本」。'}</p>
+            <p class="text-xs text-slate-500">${isPassed ? '🎉 恭喜通過測驗！' : '💪 答錯的題目已加入「複習區」。'}</p>
           </div>
           <div class="pt-2 space-y-2">
             <button onclick="closeModal()" class="w-full py-3 bg-slate-800 text-white rounded-2xl text-xs font-bold transition">
               返回練習區
             </button>
             <button onclick="switchPhase(99); closeModal();" class="w-full py-3 bg-red-600 text-white rounded-2xl text-xs font-bold transition">
-              查看錯題本
+              查看複習區
             </button>
           </div>
         </div>
