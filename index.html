@@ -20,7 +20,6 @@
       font-family: 'Noto Sans TC', 'Noto Sans JP', sans-serif;
       -webkit-tap-highlight-color: transparent;
     }
-    /* 隱藏橫向滾動條 */
     .no-scrollbar::-webkit-scrollbar {
       display: none;
     }
@@ -32,7 +31,7 @@
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col antialiased">
 
-  <!-- Header 導覽列 (手機優化) -->
+  <!-- Header 導覽列 -->
   <header class="bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-40 shadow-xs">
     <div class="max-w-5xl mx-auto px-4 py-2.5 flex items-center justify-between">
       <div class="flex items-center gap-2.5">
@@ -45,10 +44,14 @@
         </div>
       </div>
       
-      <div class="flex items-center gap-2">
-        <!-- 開發者模式按鈕 -->
-        <button id="developerButton" onclick="toggleDevModeModal()" title="開發者模式" aria-label="開啟開發者模式" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs transition">
+      <div class="flex items-center gap-1.5">
+        <!-- 開發者模式快速切換按鈕 -->
+        <button id="developerButton" onclick="toggleDeveloperMode()" title="切換開發者模式" aria-label="切換開發者模式" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs transition">
           <i class="fa-solid fa-code"></i>
+        </button>
+        <!-- 設定選單按鈕 (開啟對話視窗) -->
+        <button onclick="toggleDevModeModal()" title="開發者設定選單" aria-label="開發者設定選單" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs transition">
+          <i class="fa-solid fa-gear"></i>
         </button>
       </div>
     </div>
@@ -64,15 +67,15 @@
       </div>
     </nav>
 
-    <!-- 頂部資訊卡片 (狀態、計時與手動更新) -->
+    <!-- 頂部資訊卡片 -->
     <div id="statusHeader" class="bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-2xl p-4 text-white shadow-md shadow-indigo-100 space-y-2">
       <div class="flex items-center justify-between">
         <span id="phaseBadge" class="px-2.5 py-0.5 bg-white/20 backdrop-blur-md text-white text-[11px] font-bold rounded-lg border border-white/20">
           階段 1
         </span>
         <div id="networkControl" class="hidden flex items-center gap-2 text-xs">
-          <span class="text-indigo-200 text-[10px]">內容更新:</span>
-          <span id="countdownTimer" class="font-mono font-bold text-amber-300">30:00</span>
+          <span id="updateLabel" class="text-indigo-200 text-[10px]">字卡手動更新:</span>
+          <span id="countdownTimer" class="hidden font-mono font-bold text-amber-300">30:00</span>
           <button onclick="triggerNetworkUpdate()" title="手動更新內容" aria-label="手動更新內容" class="ml-1 w-6 h-6 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition">
             <i class="fa-solid fa-arrows-rotate text-[10px]" id="refreshSpinner"></i>
           </button>
@@ -81,7 +84,7 @@
       <h2 id="phaseTitle" class="text-base font-bold leading-tight">清音 50 音基礎練習區</h2>
     </div>
 
-    <!-- 開發者模式選單 (Modal 形式) -->
+    <!-- 開發者模式選單 (Modal) -->
     <div id="devModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 hidden">
       <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-2xl p-5 space-y-4 shadow-2xl">
         <div class="flex justify-between items-center border-b pb-2">
@@ -93,14 +96,14 @@
           </button>
         </div>
         <div class="grid grid-cols-1 gap-2 text-xs">
-          <p class="p-3 bg-emerald-50 text-emerald-800 rounded-xl font-bold">開發者模式已開啟：所有階段與測驗均可使用。</p>
-          <button onclick="disableDeveloperMode()" class="p-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-medium text-left">關閉開發者模式</button>
+          <p id="devModalStatus" class="p-3 bg-slate-50 text-slate-700 rounded-xl font-medium">目前開發者模式：關閉</p>
+          <button onclick="toggleDeveloperMode(); updateDevModalStatus();" class="p-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-900 rounded-xl font-medium text-left">切換開發者模式開關</button>
           <button onclick="triggerNetworkUpdate(); toggleDevModeModal();" class="p-3 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-xl font-medium text-left flex items-center justify-between">
-            <span>⚡ 強制刷新網路 API 題庫</span>
+            <span>⚡ 強制刷新目前內容/例句</span>
             <i class="fa-solid fa-bolt text-amber-500"></i>
           </button>
           <button onclick="timerSeconds=5; updateTimerDisplay(); toggleDevModeModal();" class="p-3 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-xl font-medium text-left flex items-center justify-between">
-            <span>⏱️ 將倒數計時縮短至 5 秒</span>
+            <span>⏱️ 將倒數計時縮短至 5 秒 (階段4~5)</span>
             <i class="fa-solid fa-clock text-amber-500"></i>
           </button>
           <button onclick="clearWrongQuestions(); toggleDevModeModal();" class="p-3 bg-red-50 hover:bg-red-100 text-red-800 rounded-xl font-medium text-left flex items-center justify-between">
@@ -118,10 +121,9 @@
 
   </main>
 
-  <!-- 全螢幕測驗 Modal (手機端滿版設計) -->
+  <!-- 全螢幕測驗 Modal -->
   <div id="testModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-md flex items-end sm:items-center justify-center z-50 hidden">
     <div class="bg-white w-full max-w-md h-[92vh] sm:h-auto sm:max-h-[85vh] rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col">
-      <!-- Modal Header -->
       <div class="bg-slate-900 text-white px-5 py-3.5 flex justify-between items-center shrink-0">
         <div class="flex items-center gap-2">
           <i class="fa-solid fa-graduation-cap text-indigo-400"></i>
@@ -131,7 +133,6 @@
           <i class="fa-solid fa-xmark text-lg"></i>
         </button>
       </div>
-      <!-- Modal Body -->
       <div class="p-5 overflow-y-auto flex-1 space-y-4" id="modalBody">
         <!-- 測驗內容動態渲染 -->
       </div>
@@ -175,7 +176,7 @@
       return result;
     }
 
-    // 階段 1：46 清音
+    // 階段資料定義
     const phase1Data = [
       { kana: 'あ', romaji: 'a', word: '朝', reading: 'あさ', meaning: '早晨' },
       { kana: 'い', romaji: 'i', word: '犬', reading: 'いぬ', meaning: '狗' },
@@ -225,7 +226,6 @@
       { kana: 'ん', romaji: 'n', word: '本', reading: 'ほん', meaning: '書籍' }
     ];
 
-    // 階段 2：25 濁音 / 半濁音
     const phase2Data = [
       { kana: 'が', romaji: 'ga', word: '外国人', reading: 'がいこくじん', meaning: '外國人' },
       { kana: 'ぎ', romaji: 'gi', word: '銀行', reading: 'ぎんこう', meaning: '銀行' },
@@ -254,7 +254,6 @@
       { kana: 'ぽ', romaji: 'po', word: 'ポケット', reading: 'ぽけっと', meaning: '口袋' }
     ];
 
-    // 階段 3：33 拗音
     const phase3Data = [
       { kana: 'きゃ', romaji: 'kya', word: '客', reading: 'きゃく', meaning: '顧客' },
       { kana: 'きゅ', romaji: 'kyu', word: '急行', reading: 'きゅうこう', meaning: '急行列車' },
@@ -301,42 +300,27 @@
       { jp: 'これをください。', tw: '請給我這個。', scenario: '購物' },
       { jp: 'おすすめは何ですか。', tw: '有什麼推薦的嗎？', scenario: '用餐' },
       { jp: 'トイレはどこですか。', tw: '洗手間在哪裡？', scenario: '問路' },
-      { jp: 'ちょっと待ってください。', tw: '請稍等一下。', scenario: '日常會話' },
-      { jp: '大丈夫です。', tw: '沒關係／我沒事。', scenario: '日常會話' },
-      { jp: 'また明日。', tw: '明天見。', scenario: '日常問候' },
-      { jp: '写真を撮ってもいいですか。', tw: '可以拍照嗎？', scenario: '外出' },
-      { jp: 'カードで払えますか。', tw: '可以刷卡嗎？', scenario: '付款' },
-      { jp: '日本語は少ししか話せません。', tw: '我只會說一點日文。', scenario: '日常會話' }
+      { jp: 'ちょっと待ってください。', tw: '請稍等一下。', scenario: '日常會話' }
     ];
 
     const backupPhase5 = [
       { title: '請求幫忙', formula: '動詞て形 + ください', example: 'ちょっと待ってください。(請稍等一下。)' },
       { title: '禮貌詢問', formula: '疑問詞 + ですか', example: 'トイレはどこですか。(洗手間在哪裡？)' },
       { title: '表達想要', formula: '名詞 + が欲しいです', example: '水が欲しいです。(我想要水。)' },
-      { title: '表達想做', formula: '動詞ます形去掉ます + たいです', example: '日本に行きたいです。(我想去日本。)' },
-      { title: '詢問許可', formula: '動詞て形 + もいいですか', example: 'ここに座ってもいいですか。(可以坐這裡嗎？)' },
-      { title: '表達正在做', formula: '動詞て形 + います', example: '今、昼ご飯を食べています。(我現在正在吃午餐。)' },
-      { title: '描述習慣', formula: '時間 + 動詞ます形', example: '毎朝コーヒーを飲みます。(我每天早上喝咖啡。)' },
-      { title: '表達原因', formula: '原因 + から、結果', example: '雨が降っているから、家にいます。(因為在下雨，所以待在家。)' },
-      { title: '表達經驗', formula: '動詞た形 + ことがあります', example: '日本へ行ったことがあります。(我去過日本。)' },
-      { title: '表達否定', formula: 'い形容詞去掉い + くないです', example: '今日は寒くないです。(今天不冷。)' },
-      { title: '表達比較', formula: 'A より B のほうが + 形容詞', example: '電車よりバスのほうが安いです。(公車比電車便宜。)' },
-      { title: '邀請對方', formula: '動詞ます形去掉ます + ませんか', example: '一緒に昼ご飯を食べませんか。(要不要一起吃午餐？)' }
+      { title: '表達想做', formula: '動詞ます形去掉ます + たいです', example: '日本に行きたいです。(我想去日本。)' }
     ];
 
-    let dynamicPhase4Data = backupPhase4.slice(0, 5);
-    let dynamicPhase5Data = backupPhase5.slice(0, 4);
+    let dynamicPhase4Data = shuffle(backupPhase4).slice(0, 5);
+    let dynamicPhase5Data = shuffle(backupPhase5).slice(0, 4);
     const hasLoadedOnlineContent = { 4: false, 5: false };
-    const contentUpdateStatus = { 4: '目前顯示內建例句，按更新取得網路句子。', 5: '目前顯示內建例句，按更新取得網路句子。' };
+    const contentUpdateStatus = { 4: '目前顯示豐富例句庫，可隨時更新取得線上內容。', 5: '目前顯示豐富例句庫，可隨時更新取得線上內容。' };
     let contentRequestId = 0;
-    const dailyQueries = ['ありがとう', 'お願い', '駅', '電車', 'バス', '食べ', '飲み', '買い', '時間', '仕事', '学校', '友達', '天気', '今日', '明日'];
+    const dailyQueries = ['ありがとう', 'お願い', '駅', '電車', 'バス', '食べ', '飲み', '買い', '時間', '仕事'];
     const grammarQueries = [
       { title: '請求與拜託', formula: '動詞て形 + ください', query: 'ください' },
       { title: '詢問許可', formula: '動詞て形 + もいいですか', query: 'てもいいですか' },
       { title: '表達想做', formula: '動詞ます形去掉ます + たいです', query: 'たいです' },
-      { title: '表達正在做', formula: '動詞て形 + います', query: 'ています' },
-      { title: '禮貌詢問', formula: '疑問詞 + ですか', query: 'どこですか' },
-      { title: '表達經驗', formula: '動詞た形 + ことがあります', query: 'ことがあります' }
+      { title: '表達正在做', formula: '動詞て形 + います', query: 'ています' }
     ];
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -361,7 +345,7 @@
     }
 
     function saveProgress() {
-      try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress)); } catch (_) { /* Private browsing may block storage. */ }
+      try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress)); } catch (_) {}
     }
 
     function phaseUnlocked(phase) {
@@ -407,23 +391,40 @@
       document.addEventListener('visibilitychange', () => { if (document.hidden) saveProgress(); });
     }
 
+    // 獨立的開發者模式開關與設定選單
+    function toggleDeveloperMode() {
+      developerMode = !developerMode;
+      const btn = document.getElementById('developerButton');
+      if (developerMode) {
+        btn.classList.add('bg-emerald-100', 'text-emerald-700', 'ring-2', 'ring-emerald-400');
+      } else {
+        btn.classList.remove('bg-emerald-100', 'text-emerald-700', 'ring-2', 'ring-emerald-400');
+      }
+      renderTabs();
+      renderStudyStatus();
+      updateDevModalStatus();
+    }
+
     function toggleDevModeModal() {
       const modal = document.getElementById('devModal');
-      if (modal.classList.contains('hidden')) {
-        developerMode = true;
-        document.getElementById('developerButton').classList.add('bg-emerald-100', 'text-emerald-700');
-        renderTabs();
-        renderStudyStatus();
-      }
+      updateDevModalStatus();
       modal.classList.toggle('hidden');
     }
 
-    function disableDeveloperMode() {
-      developerMode = false;
-      document.getElementById('developerButton').classList.remove('bg-emerald-100', 'text-emerald-700');
-      document.getElementById('devModal').classList.add('hidden');
-      if (!phaseUnlocked(currentPhase)) switchPhase(1);
-      else { renderTabs(); renderStudyStatus(); }
+    function updateDevModalStatus() {
+      const statusEl = document.getElementById('devModalStatus');
+      const btn = document.getElementById('developerButton');
+      if (statusEl) {
+        statusEl.textContent = developerMode ? '目前開發者模式：已開啟 (可略過學習時數直接考試)' : '目前開發者模式：已關閉';
+        statusEl.className = developerMode ? 'p-3 bg-emerald-50 text-emerald-800 rounded-xl font-bold' : 'p-3 bg-slate-50 text-slate-700 rounded-xl font-medium';
+      }
+      if (btn) {
+        if (developerMode) {
+          btn.classList.add('bg-emerald-100', 'text-emerald-700', 'ring-2', 'ring-emerald-400');
+        } else {
+          btn.classList.remove('bg-emerald-100', 'text-emerald-700', 'ring-2', 'ring-emerald-400');
+        }
+      }
     }
 
     function renderTabs() {
@@ -465,11 +466,17 @@
 
       const netControl = document.getElementById('networkControl');
       const countdownTimer = document.getElementById('countdownTimer');
+      const updateLabel = document.getElementById('updateLabel');
+      
       if (phaseId <= 5) {
         netControl.classList.remove('hidden');
-        countdownTimer.classList.toggle('hidden', phaseId <= 3);
-        netControl.querySelector('span').textContent = phaseId <= 3 ? '字卡手動更新：' : '內容更新：';
-        netControl.querySelector('button').setAttribute('aria-label', phaseId <= 3 ? '手動更新目前字卡例句' : '手動更新內容');
+        if (phaseId <= 3) {
+          countdownTimer.classList.add('hidden');
+          updateLabel.textContent = '字卡手動更新:';
+        } else {
+          countdownTimer.classList.remove('hidden');
+          updateLabel.textContent = '內容更新:';
+        }
       } else {
         netControl.classList.add('hidden');
       }
@@ -499,46 +506,81 @@
       if (timerEl) timerEl.innerText = `${m}:${s}`;
     }
 
-    async function searchDailySentences(query, page = Math.floor(Math.random() * 3) + 1) {
-      const url = `https://tatoeba.org/en/api_v0/search?from=jpn&to=cmn&query=${encodeURIComponent(query)}&page=${page}`;
-      const response = await fetch(url);
-      if (!response.ok) throw new Error('network');
-      const payload = await response.json();
-      return (payload.results || []).flatMap(item => {
-        const translations = (item.translations || []).flat();
-        const translation = translations.find(entry => entry?.lang === 'cmn' && entry.text);
-        const jp = item.text?.trim();
-        const tw = translation?.text?.trim();
-        return jp && tw && jp.length <= 70 && tw.length <= 100 ? [{ jp, tw }] : [];
-      });
+    async function searchDailySentences(query, page = 1) {
+      const targetUrl = `https://tatoeba.org/en/api_v0/search?from=jpn&to=cmn&query=${encodeURIComponent(query)}&page=${page}`;
+      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+      try {
+        const response = await fetch(proxyUrl, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (!response.ok) throw new Error('network error');
+        const payload = await response.json();
+        return (payload.results || []).flatMap(item => {
+          const translations = (item.translations || []).flat();
+          const translation = translations.find(entry => entry?.lang === 'cmn' && entry.text);
+          const jp = item.text?.trim();
+          const tw = translation?.text?.trim();
+          return jp && tw && jp.length <= 70 && tw.length <= 100 ? [{ jp, tw }] : [];
+        });
+      } catch (err) {
+        clearTimeout(timeoutId);
+        throw err;
+      }
     }
 
+    // 統一的更新觸發點（對應截圖中的更新定義）
     async function triggerNetworkUpdate() {
-      if (currentPhase <= 3) return updateSelectedExample(currentPhase);
-      if (currentPhase !== 4 && currentPhase !== 5) return;
+      const spinner = document.getElementById('refreshSpinner');
+      if (spinner) spinner.classList.add('fa-spin');
+
+      if (currentPhase <= 3) {
+        // 階段 1~3：點擊頂部或卡片更新，重新整理當前選中的字卡例句
+        if (selectedExamples[currentPhase] === null) {
+          selectExample(currentPhase, 0, false);
+        }
+        await updateSelectedExample(currentPhase);
+        if (spinner) spinner.classList.remove('fa-spin');
+        return;
+      }
+
+      if (currentPhase !== 4 && currentPhase !== 5) {
+        if (spinner) spinner.classList.remove('fa-spin');
+        return;
+      }
+
       timerSeconds = 1800;
       updateTimerDisplay();
       const phase = currentPhase;
       const requestId = ++contentRequestId;
-      const spinner = document.getElementById('refreshSpinner');
-      if (spinner) spinner.classList.add('fa-spin');
-      contentUpdateStatus[phase] = '正在取得網路例句…';
+      contentUpdateStatus[phase] = '正在連線取得網路例句…';
       renderContent();
       renderStudyStatus();
+
       try {
         if (phase === 4) {
           const queries = shuffle(dailyQueries).slice(0, 3);
-          const results = await Promise.allSettled(queries.map(searchDailySentences));
+          const results = await Promise.allSettled(queries.map(q => searchDailySentences(q)));
           const current = new Set(dynamicPhase4Data.map(item => item.jp));
           const unique = new Set();
           const sentences = results.flatMap(result => result.status === 'fulfilled' ? result.value : [])
             .filter(item => !current.has(item.jp) && !unique.has(item.jp) && unique.add(item.jp));
-          if (sentences.length < 3) throw new Error('not enough sentences');
+          
           if (requestId !== contentRequestId) return;
-          dynamicPhase4Data = shuffle(sentences).slice(0, 5).map(item => ({ ...item, scenario: '網路日常例句' }));
+          if (sentences.length >= 3) {
+            dynamicPhase4Data = shuffle(sentences).slice(0, 5).map(item => ({ ...item, scenario: '網路日常例句' }));
+            hasLoadedOnlineContent[phase] = true;
+            contentUpdateStatus[phase] = '網路例句來源：Tatoeba (透過代理成功)';
+          } else {
+            dynamicPhase4Data = shuffle(backupPhase4).slice(0, 5);
+            contentUpdateStatus[phase] = '已隨機切換內建實戰會話庫。';
+          }
         } else {
           const queries = shuffle(grammarQueries).slice(0, 4);
           const results = await Promise.allSettled(queries.map(item => searchDailySentences(item.query, 1)));
+          
           const current = new Set(dynamicPhase5Data.map(item => item.example));
           const online = queries.flatMap((item, index) => {
             const result = results[index];
@@ -546,15 +588,23 @@
             const sentence = shuffle(result.value).find(entry => entry.jp.includes(item.query) && !current.has(`${entry.jp}（${entry.tw}）`));
             return sentence ? [{ title: item.title, formula: item.formula, example: `${sentence.jp}（${sentence.tw}）` }] : [];
           });
-          if (online.length < 2) throw new Error('not enough sentences');
+
           if (requestId !== contentRequestId) return;
-          dynamicPhase5Data = online;
+          if (online.length >= 2) {
+            dynamicPhase5Data = online;
+            hasLoadedOnlineContent[phase] = true;
+            contentUpdateStatus[phase] = '網路語法例句來源：Tatoeba';
+          } else {
+            dynamicPhase5Data = shuffle(backupPhase5).slice(0, 4);
+            contentUpdateStatus[phase] = '已隨機切換內建綜合文法庫。';
+          }
         }
-        if (requestId !== contentRequestId) return;
-        hasLoadedOnlineContent[phase] = true;
-        contentUpdateStatus[phase] = '網路例句來源：Tatoeba';
       } catch (_) {
-        if (requestId === contentRequestId) contentUpdateStatus[phase] = '目前無法取得新例句，保留原有內容。';
+        if (requestId === contentRequestId) {
+          if (phase === 4) dynamicPhase4Data = shuffle(backupPhase4).slice(0, 5);
+          else dynamicPhase5Data = shuffle(backupPhase5).slice(0, 4);
+          contentUpdateStatus[phase] = '網路連線逾時，已自動載入豐富內建例句庫。';
+        }
       } finally {
         if (requestId === contentRequestId && currentPhase === phase) {
           if (spinner) spinner.classList.remove('fa-spin');
@@ -589,8 +639,9 @@
       } catch (_) {
         if (requestId === exampleRequestIds[phase][index]) {
           exampleSentences[phase][index] = {
-            ...exampleSentences[phase][index],
-            status: '目前無法取得新例句，保留原有內容。'
+            jp: `これは${item.word}です。`,
+            tw: `這是${item.meaning}。`,
+            status: '已切換至該詞彙的實用基礎例句。'
           };
         }
       } finally {
@@ -811,8 +862,8 @@
       if (phase === 1) sourcePool = phase1Data;
       else if (phase === 2) sourcePool = phase2Data;
       else if (phase === 3) sourcePool = phase3Data;
-      else if (phase === 4) sourcePool = dynamicPhase4Data;
-      else if (phase === 5) sourcePool = dynamicPhase5Data;
+      else if (phase === 4) sourcePool = [...dynamicPhase4Data, ...backupPhase4];
+      else if (phase === 5) sourcePool = [...dynamicPhase5Data, ...backupPhase5];
 
       let questions = [];
       const targets = shuffle(sourcePool);
@@ -849,7 +900,6 @@
 
       body.innerHTML = `
         <div class="space-y-4">
-          <!-- 進度條 -->
           <div class="space-y-1">
             <div class="flex justify-between text-[11px] font-bold text-slate-400">
               <span>進度：${currentQuestionIdx + 1} / 20</span>
@@ -859,13 +909,9 @@
               <div class="bg-indigo-600 h-full transition-all duration-300" style="width: ${((currentQuestionIdx + 1) / 20) * 100}%"></div>
             </div>
           </div>
-
-          <!-- 題目卡片 -->
           <div class="py-2">
             <h4 class="text-base font-bold text-slate-800 leading-snug">${escapeHtml(q.qText)}</h4>
           </div>
-
-          <!-- 選項按鈕 -->
           <div class="space-y-2 pt-1">
             ${q.options.map((opt, index) => `
               <button data-answer-index="${index}" class="w-full p-3.5 bg-slate-50 hover:bg-indigo-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-700 text-left transition active:scale-98 flex items-center justify-between">
@@ -964,7 +1010,7 @@
       let list = getStoredWrongQuestions();
       if (!list.some(x => x.question === item.question)) {
         list.push(item);
-        try { localStorage.setItem('jp_app_wrong_questions', JSON.stringify(list)); } catch (_) { /* Keep the test usable. */ }
+        try { localStorage.setItem('jp_app_wrong_questions', JSON.stringify(list)); } catch (_) {}
       }
     }
 
@@ -995,7 +1041,6 @@
       activeTestPhase = null;
       renderStudyStatus();
     }
-
   </script>
 </body>
 </html>
