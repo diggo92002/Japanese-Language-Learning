@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#4338ca">
+  <link rel="icon" type="image/png" href="icon.png">
+  <title>日常生活用語 2,000 句｜日文學習平台</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, "Noto Sans TC", "Noto Sans JP", sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f4f5fb; color: #20243a; }
+    a { color: inherit; }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    button:disabled { cursor: not-allowed; opacity: .45; }
+    .wrap { width: min(100% - 28px, 860px); margin-inline: auto; }
+    header { background: #4338ca; color: white; padding: 22px 0 26px; }
+    .back { display: inline-flex; align-items: center; gap: 5px; text-decoration: none; font-size: 14px; opacity: .9; }
+    .back:hover { text-decoration: underline; }
+    h1 { font-size: clamp(24px, 5vw, 34px); margin: 15px 0 7px; }
+    header p { color: #e0e7ff; margin: 0; line-height: 1.5; }
+    main { padding-block: 20px 46px; }
+    .tools { display: grid; grid-template-columns: 1fr 180px; gap: 10px; margin-bottom: 12px; }
+    .tools input, .tools select, .page-jump input { border: 1px solid #ccd2e2; border-radius: 12px; background: white; color: #20243a; padding: 11px 13px; min-width: 0; }
+    .tools input:focus, .tools select:focus, .page-jump input:focus { outline: 2px solid #818cf8; outline-offset: 1px; }
+    .summary { color: #596274; font-size: 13px; margin: 0 0 12px; }
+    .list { display: grid; gap: 10px; }
+    .card { background: white; border: 1px solid #e1e5f0; border-radius: 16px; padding: 16px; box-shadow: 0 2px 8px #18214a08; }
+    .card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .tag { display: inline-block; background: #eef2ff; color: #4338ca; border-radius: 7px; padding: 4px 8px; font-size: 12px; font-weight: 700; }
+    .number { color: #6b7280; font-size: 12px; margin-left: 8px; }
+    .speak { border: 1px solid #c7d2fe; background: #eef2ff; color: #3730a3; border-radius: 9px; padding: 6px 10px; font-size: 13px; }
+    .jp { font-size: 18px; font-weight: 700; line-height: 1.65; margin: 10px 0 4px; }
+    .zh { color: #525d71; line-height: 1.5; margin: 0; }
+    .pager { display: flex; justify-content: space-between; align-items: center; gap: 10px; background: white; border: 1px solid #e1e5f0; border-radius: 14px; padding: 10px; margin-top: 14px; }
+    .pager button { border: 0; background: #eef2ff; color: #3730a3; border-radius: 9px; padding: 9px 12px; white-space: nowrap; font-weight: 700; }
+    .page-jump { display: flex; align-items: center; gap: 6px; color: #596274; font-size: 13px; }
+    .page-jump input { width: 68px; padding: 8px; text-align: center; }
+    .empty { background: white; border-radius: 16px; padding: 28px; text-align: center; color: #596274; }
+    @media (max-width: 520px) {
+      .tools { grid-template-columns: 1fr; }
+      .pager { flex-wrap: wrap; }
+      .page-jump { order: -1; justify-content: center; width: 100%; }
+    }
+  </style>
+  <script src="daily-phrases-data.js" defer></script>
+  <script defer>
+    const PAGE_SIZE = 20;
+    const STORAGE_KEY = 'jp_daily_phrases_view_v1';
+    const phrases = [];
+    let state = { category: 'all', query: '', page: 1 };
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
+    }
+
+    function loadState() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+        if (typeof saved.category === 'string') state.category = saved.category;
+        if (typeof saved.query === 'string') state.query = saved.query;
+        if (Number.isSafeInteger(saved.page) && saved.page > 0) state.page = saved.page;
+      } catch (_) { /* Private browsing or blocked storage still allows reading. */ }
+    }
+
+    function saveState() {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (_) {}
+    }
+
+    function buildPhrases() {
+      const groups = window.DAILY_PHRASE_GROUPS || [];
+      for (let termIndex = 0; termIndex < 20; termIndex++) {
+        for (let patternIndex = 0; patternIndex < 20; patternIndex++) {
+          for (const group of groups) {
+            const [japanesePattern, chinesePattern] = group.patterns[patternIndex];
+            const [japaneseTerm, chineseTerm] = group.terms[termIndex];
+            phrases.push({
+              category: group.name,
+              jp: japanesePattern.replaceAll('{x}', japaneseTerm),
+              zh: chinesePattern.replaceAll('{x}', chineseTerm)
+            });
+          }
+        }
+      }
+    }
+
+    function filteredPhrases() {
+      const query = state.query.trim().toLocaleLowerCase();
+      return phrases.map((item, index) => ({ ...item, number: index + 1 })).filter(item =>
+        (state.category === 'all' || item.category === state.category) &&
+        (!query || `${item.jp} ${item.zh}`.toLocaleLowerCase().includes(query))
+      );
+    }
+
+    function render() {
+      const results = filteredPhrases();
+      const totalPages = Math.max(1, Math.ceil(results.length / PAGE_SIZE));
+      state.page = Math.min(Math.max(1, state.page), totalPages);
+      const currentItems = results.slice((state.page - 1) * PAGE_SIZE, state.page * PAGE_SIZE);
+      document.getElementById('summary').textContent = `找到 ${results.length.toLocaleString('zh-TW')} 句 · 每頁 ${PAGE_SIZE} 句`;
+      document.getElementById('list').innerHTML = currentItems.length ? currentItems.map(item => `
+        <article class="card">
+          <div class="card-top">
+            <div><span class="tag">${escapeHtml(item.category)}</span><span class="number">第 ${item.number} 句</span></div>
+            <button type="button" class="speak" data-jp="${escapeHtml(item.jp)}" aria-label="朗讀日文">🔊 朗讀</button>
+          </div>
+          <p class="jp" lang="ja">${escapeHtml(item.jp)}</p>
+          <p class="zh">${escapeHtml(item.zh)}</p>
+        </article>
+      `).join('') : '<p class="empty">找不到符合條件的句子，請試試其他關鍵字。</p>';
+      document.getElementById('pageNumber').value = state.page;
+      document.getElementById('pageNumber').max = totalPages;
+      document.getElementById('pageTotal').textContent = `/ ${totalPages} 頁`;
+      document.getElementById('previous').disabled = state.page === 1;
+      document.getElementById('next').disabled = state.page === totalPages;
+      saveState();
+    }
+
+    function changePage(page) {
+      state.page = page;
+      render();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      if (!window.DAILY_PHRASE_GROUPS) {
+        document.getElementById('list').innerHTML = '<p class="empty">句子資料未載入，請確認 daily-phrases-data.js 與此頁在同一資料夾。</p>';
+        return;
+      }
+      buildPhrases();
+      loadState();
+      const category = document.getElementById('category');
+      for (const group of window.DAILY_PHRASE_GROUPS) {
+        const option = document.createElement('option');
+        option.value = group.name;
+        option.textContent = group.name;
+        category.append(option);
+      }
+      if (![...category.options].some(option => option.value === state.category)) state.category = 'all';
+      category.value = state.category;
+      document.getElementById('search').value = state.query;
+      document.getElementById('search').addEventListener('input', event => {
+        state.query = event.target.value;
+        state.page = 1;
+        render();
+      });
+      category.addEventListener('change', event => {
+        state.category = event.target.value;
+        state.page = 1;
+        render();
+      });
+      document.getElementById('previous').addEventListener('click', () => changePage(state.page - 1));
+      document.getElementById('next').addEventListener('click', () => changePage(state.page + 1));
+      document.getElementById('pageNumber').addEventListener('change', event => changePage(Number(event.target.value) || 1));
+      document.getElementById('list').addEventListener('click', event => {
+        const button = event.target.closest('[data-jp]');
+        if (!button || !('speechSynthesis' in window)) return;
+        speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(button.dataset.jp);
+        utterance.lang = 'ja-JP';
+        utterance.rate = 0.9;
+        speechSynthesis.speak(utterance);
+      });
+      render();
+    });
+  </script>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <a class="back" href="index.html">← 返回日文闖關學習</a>
+      <h1>日常生活用語 2,000 句</h1>
+      <p>日文例句＋繁體中文對照 · 五種生活情境 · 可搜尋、分頁與記住閱讀位置</p>
+    </div>
+  </header>
+  <main class="wrap">
+    <div class="tools">
+      <input id="search" type="search" placeholder="搜尋日文或中文" aria-label="搜尋日文或中文">
+      <select id="category" aria-label="選擇生活情境"><option value="all">所有情境</option></select>
+    </div>
+    <p id="summary" class="summary" aria-live="polite"></p>
+    <section id="list" class="list" aria-label="日常生活例句"></section>
+    <nav class="pager" aria-label="例句分頁">
+      <button id="previous" type="button">上一頁</button>
+      <label class="page-jump">第 <input id="pageNumber" type="number" min="1" step="1" aria-label="跳至第幾頁"> <span id="pageTotal"></span></label>
+      <button id="next" type="button">下一頁</button>
+    </nav>
+  </main>
+</body>
+</html>
